@@ -1,16 +1,28 @@
 {
-  "name": "robot-mcp",
-  "version": "1.0.0",
-  "main": "index.js",
+  "name": "mcp-desktop-automation",
+  "version": "0.1.0",
+  "description": "Model Context Protocol server for desktop automation",
+  "main": "server.js",
   "scripts": {
+    "start": "node server.js",
+    "client": "node client.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "mcp",
+    "automation",
+    "desktop",
+    "screenshot",
+    "robotjs"
+  ],
   "author": "",
-  "license": "ISC",
-  "description": "",
+  "license": "MIT",
   "dependencies": {
+    "axios": "^1.6.2",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
     "robotjs": "^0.6.0",
-    "screenshot-desktop": "^1.15.1"
+    "screenshot-desktop": "^1.15.0",
+    "ws": "^8.14.2"
   }
 }
