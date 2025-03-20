@@ -19,21 +19,33 @@ ws.on('open', () => {
 });
 
 ws.on('message', (message) => {
-  const data = JSON.parse(message);
-  
-  if (data.type === 'capabilities') {
-    console.log('Received capabilities:', Object.keys(data.data));
-  } else if (data.type === 'result') {
-    console.log(`Result for request #${data.requestId}:`, 
-      data.result && typeof data.result === 'object' ? JSON.stringify(data.result) : 'Result received');
+  try {
+    const data = JSON.parse(message);
     
-    // If this is a screen capture, save the image
-    if (data.result && typeof data.result === 'string' && data.result.startsWith('data:image')) {
-      const timestamp = Math.floor(Date.now() / 1000);
-      saveBase64Image(data.result, `screenshot-${timestamp}.png`);
+    if (data.type === 'capabilities') {
+      console.log('Received capabilities:', Object.keys(data.data));
+    } else if (data.type === 'result') {
+      // Log result info without the full base64 string
+      console.log(`Result for request #${data.requestId}:`, 
+        data.result && data.result.success !== undefined 
+          ? `Success: ${data.result.success}` 
+          : 'Result received');
+      
+      // Check if this is a screen capture result
+      if (data.result && 
+          data.result.success && 
+          data.result.result && 
+          typeof data.result.result === 'string' && 
+          data.result.result.startsWith('data:image')) {
+        
+        const timestamp = Math.floor(Date.now() / 1000);
+        saveBase64Image(data.result.result, `screenshot-${timestamp}.png`);
+      }
+    } else if (data.type === 'error') {
+      console.error('Error from server:', data.error);
     }
-  } else if (data.type === 'error') {
-    console.error('Error from server:', data.error);
+  } catch (error) {
+    console.error('Error processing WebSocket message:', error);
   }
 });
 
@@ -48,16 +60,20 @@ function executeCapability(capability, params = {}) {
   return new Promise((resolve, reject) => {
     // Set up one-time listener for this specific request
     const messageHandler = (message) => {
-      const data = JSON.parse(message);
-      
-      if (data.requestId === id) {
-        ws.removeListener('message', messageHandler);
+      try {
+        const data = JSON.parse(message);
         
-        if (data.type === 'error') {
-          reject(new Error(data.error));
-        } else {
-          resolve(data.result);
+        if (data.requestId === id) {
+          ws.removeListener('message', messageHandler);
+          
+          if (data.type === 'error') {
+            reject(new Error(data.error));
+          } else {
+            resolve(data.result);
+          }
         }
+      } catch (error) {
+        console.error('Error parsing message:', error);
       }
     };
     
@@ -81,16 +97,22 @@ function executeCapability(capability, params = {}) {
 
 // Function to save base64 image
 function saveBase64Image(base64Data, filename) {
-  // Remove the data URL prefix
-  const base64Image = base64Data.split(';base64,').pop();
-  
-  fs.writeFile(filename, base64Image, {encoding: 'base64'}, (err) => {
-    if (err) {
-      console.error('Error saving image:', err);
-    } else {
-      console.log(`Image saved as ${filename}`);
-    }
-  });
+  try {
+    // Remove the data URL prefix
+    const base64Image = base64Data.split(';base64,').pop();
+    
+    fs.writeFile(filename, base64Image, {encoding: 'base64'}, (err) => {
+      if (err) {
+        console.error('Error saving image:', err);
+      } else {
+        console.log(`Image saved as ${filename}`);
+      }
+    });
+  } catch (error) {
+    console.error('Error saving image:', error);
+    console.error('Base64 data type:', typeof base64Data);
+    console.error('Base64 data starts with:', base64Data ? base64Data.substring(0, 50) + '...' : 'undefined');
+  }
 }
 
 // Demo function to showcase capabilities
@@ -100,13 +122,18 @@ async function runDemo() {
     console.log('Getting screen size...');
     const screenSizeResult = await executeCapability('get_screen_size');
     
-    // Fix: Properly access the screen size from the result object
-    const screenSize = screenSizeResult.result || screenSizeResult;
+    // The result has this structure: { success: true, result: { width: X, height: Y } }
+    if (!screenSizeResult.success || !screenSizeResult.result) {
+      throw new Error('Failed to get screen size');
+    }
+    
+    const screenSize = screenSizeResult.result;
     console.log('Screen size:', screenSize);
     
     // Step 2: Take initial screenshot
     console.log('Taking initial screenshot...');
-    await executeCapability('screen_capture');
+    const screenshotResult = await executeCapability('screen_capture');
+    console.log('Screenshot result success:', screenshotResult.success);
     
     // Step 3: Move mouse to center of screen
     const centerX = Math.floor(screenSize.width / 2);
@@ -137,5 +164,10 @@ async function runDemo() {
     console.log('Demo completed successfully!');
   } catch (error) {
     console.error('Demo failed:', error);
+  } finally {
+    // Close the WebSocket connection when done
+    setTimeout(() => {
+      ws.close();
+    }, 1000);
   }
 }
