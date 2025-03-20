@@ -24,11 +24,13 @@ ws.on('message', (message) => {
   if (data.type === 'capabilities') {
     console.log('Received capabilities:', Object.keys(data.data));
   } else if (data.type === 'result') {
-    console.log(`Result for request #${data.requestId}:`, data.result);
+    console.log(`Result for request #${data.requestId}:`, 
+      data.result && typeof data.result === 'object' ? JSON.stringify(data.result) : 'Result received');
     
     // If this is a screen capture, save the image
-    if (data.result && data.result.startsWith && data.result.startsWith('data:image')) {
-      saveBase64Image(data.result, `screenshot-${data.requestId}.png`);
+    if (data.result && typeof data.result === 'string' && data.result.startsWith('data:image')) {
+      const timestamp = Math.floor(Date.now() / 1000);
+      saveBase64Image(data.result, `screenshot-${timestamp}.png`);
     }
   } else if (data.type === 'error') {
     console.error('Error from server:', data.error);
@@ -96,7 +98,10 @@ async function runDemo() {
   try {
     // Step 1: Get screen size
     console.log('Getting screen size...');
-    const screenSize = await executeCapability('get_screen_size');
+    const screenSizeResult = await executeCapability('get_screen_size');
+    
+    // Fix: Properly access the screen size from the result object
+    const screenSize = screenSizeResult.result || screenSizeResult;
     console.log('Screen size:', screenSize);
     
     // Step 2: Take initial screenshot
