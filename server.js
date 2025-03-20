@@ -1,15 +1,26 @@
 // Import required packages
 const screenshot = require('screenshot-desktop');
 const robot = require('robotjs');
-const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
+const { McpServer, ResourceTemplate } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const { z } = require("zod");
 
 // Create server instance
-const server = new McpServer({
-  name: "robot-mcp",
-  version: "1.0.0",
-});
+const server = new McpServer(
+  {
+    name: "robot-mcp",
+    version: "1.0.0",
+  },
+  {
+    capabilities: {
+      resources: {},
+      tools: {},
+      logging: {},
+    },
+  },
+);
+
+const screenshots = {};
 
 // Implementation of capabilities
 const capabilityImplementations = {
@@ -17,10 +28,26 @@ const capabilityImplementations = {
     try {
       // Take a screenshot
       const img = await screenshot();
+      const imgInBase64 = img.toString('base64');
+      const timestamp = Math.floor(Date.now() / 1000);
 
-      // Convert to base64
-      const base64Image = `data:image/png;base64,${img.toString('base64')}`;
-      return { success: true, result: base64Image };
+      screenshots[`screenshot-${timestamp}`] = imgInBase64;
+      await server.server.sendResourceListChanged();
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: "Screenshot taken.",
+          },
+          {
+            type: "image",
+            mimeType: "image/png",
+            data: imgInBase64,
+          },
+        ],
+        isError: false
+      };
     } catch (error) {
       console.error('Error capturing screen:', error);
       return { success: false, error: error.message };
@@ -112,7 +139,7 @@ server.tool("get_screen_size", "Gets the screen dimensions", {},
   async () => toMcpResponse(capabilityImplementations.get_screen_size()));
 
 server.tool("screen_capture", "Captures the current screen content", {},
-  async () => toMcpResponse(capabilityImplementations.screen_capture()));
+  async () => capabilityImplementations.screen_capture());
 
 server.tool("keyboard_press", "Presses a keyboard key or key combination", {
   key: z.string().describe("Key to press (e.g., 'enter', 'a', 'control')"),
@@ -132,6 +159,38 @@ server.tool("mouse_move", "Moves the mouse to specified coordinates", {
   x: z.number().describe("X coordinate"),
   y: z.number().describe("Y coordinate")
 }, async (params) => toMcpResponse(capabilityImplementations.mouse_move(params)));
+
+server.resource(
+  "screenshot-list",
+  "screenshot://list",
+  async (uri) => {
+    const result = {
+      contents: [
+        ...Object.keys(screenshots).map(name => ({
+          uri: `screenshot://${name}`,
+          mimeType: "image/png",
+          blob: screenshots[name],
+        })),
+      ]
+    };
+
+    server.server.sendLoggingMessage({level: "info", data: `Returned ${JSON.stringify(result)}`});
+    console.error(`Returned ${JSON.stringify(result)}`);
+    return result;
+  }
+);
+
+server.resource(
+  "screenshot-content",
+  new ResourceTemplate("screenshot://{id}", { list: undefined }),
+  async (uri, { id }) => ({
+    contents: [{
+      uri: uri.href,
+      mimeType: "image/png",
+      blob: screenshots[id],
+    }]
+  })
+);
 
 async function main() {
   const transport = new StdioServerTransport();
