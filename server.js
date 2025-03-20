@@ -1,108 +1,15 @@
 // Import required packages
-const express = require('express');
-const http = require('http');
-const WebSocket = require('ws');
 const screenshot = require('screenshot-desktop');
 const robot = require('robotjs');
-const cors = require('cors');
+const { McpServer } = require("@modelcontextprotocol/sdk/server/mcp.js");
+const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
+const { z } = require("zod");
 
-// Initialize Express app
-const app = express();
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-
-// Create HTTP server
-const server = http.createServer(app);
-
-// Initialize WebSocket server
-const wss = new WebSocket.Server({ server });
-
-// Store connected clients
-const clients = new Set();
-
-// Configure server port
-const PORT = process.env.PORT || 3000;
-
-// MCP capabilities
-const capabilities = {
-  screen_capture: {
-    description: "Captures the current screen content",
-    parameters: {
-      region: {
-        type: "object",
-        description: "Screen region to capture (optional)",
-        properties: {
-          x: { type: "number" },
-          y: { type: "number" },
-          width: { type: "number" },
-          height: { type: "number" }
-        },
-        required: []
-      }
-    },
-    returns: { type: "string", description: "Base64 encoded image" }
-  },
-  mouse_move: {
-    description: "Moves the mouse to specified coordinates",
-    parameters: {
-      x: { type: "number", description: "X coordinate" },
-      y: { type: "number", description: "Y coordinate" }
-    },
-    returns: { type: "boolean", description: "Success status" }
-  },
-  mouse_click: {
-    description: "Performs a mouse click",
-    parameters: {
-      button: { 
-        type: "string", 
-        description: "Mouse button to click", 
-        enum: ["left", "right", "middle"],
-        default: "left"
-      },
-      double: { 
-        type: "boolean", 
-        description: "Whether to perform a double click", 
-        default: false
-      }
-    },
-    returns: { type: "boolean", description: "Success status" }
-  },
-  keyboard_type: {
-    description: "Types text at the current cursor position",
-    parameters: {
-      text: { type: "string", description: "Text to type" }
-    },
-    returns: { type: "boolean", description: "Success status" }
-  },
-  keyboard_press: {
-    description: "Presses a keyboard key or key combination",
-    parameters: {
-      key: { type: "string", description: "Key to press (e.g., 'enter', 'a', 'control')" },
-      modifiers: { 
-        type: "array", 
-        description: "Modifier keys to hold while pressing the key",
-        items: { 
-          type: "string", 
-          enum: ["control", "shift", "alt", "command"] 
-        },
-        default: []
-      }
-    },
-    returns: { type: "boolean", description: "Success status" }
-  },
-  get_screen_size: {
-    description: "Gets the screen dimensions",
-    parameters: {},
-    returns: { 
-      type: "object", 
-      description: "Screen dimensions",
-      properties: {
-        width: { type: "number" },
-        height: { type: "number" }
-      }
-    }
-  }
-};
+// Create server instance
+const server = new McpServer({
+  name: "robot-mcp",
+  version: "1.0.0",
+});
 
 // Implementation of capabilities
 const capabilityImplementations = {
@@ -110,7 +17,7 @@ const capabilityImplementations = {
     try {
       // Take a screenshot
       const img = await screenshot();
-      
+
       // Convert to base64
       const base64Image = `data:image/png;base64,${img.toString('base64')}`;
       return { success: true, result: base64Image };
@@ -119,7 +26,7 @@ const capabilityImplementations = {
       return { success: false, error: error.message };
     }
   },
-  
+
   mouse_move: (params) => {
     try {
       const { x, y } = params;
@@ -130,24 +37,24 @@ const capabilityImplementations = {
       return { success: false, error: error.message };
     }
   },
-  
+
   mouse_click: (params = {}) => {
     try {
       const { button = 'left', double = false } = params;
-      
+
       if (double) {
         robot.mouseClick(button, double);
       } else {
         robot.mouseClick(button);
       }
-      
+
       return { success: true };
     } catch (error) {
       console.error('Error clicking mouse:', error);
       return { success: false, error: error.message };
     }
   },
-  
+
   keyboard_type: (params) => {
     try {
       const { text } = params;
@@ -158,27 +65,27 @@ const capabilityImplementations = {
       return { success: false, error: error.message };
     }
   },
-  
+
   keyboard_press: (params) => {
     try {
       const { key, modifiers = [] } = params;
-      
+
       // Hold down modifier keys
       modifiers.forEach(modifier => robot.keyToggle(modifier, 'down'));
-      
+
       // Press and release the main key
       robot.keyTap(key);
-      
+
       // Release modifier keys
       modifiers.forEach(modifier => robot.keyToggle(modifier, 'up'));
-      
+
       return { success: true };
     } catch (error) {
       console.error('Error pressing key:', error);
       return { success: false, error: error.message };
     }
   },
-  
+
   get_screen_size: () => {
     try {
       const size = robot.getScreenSize();
@@ -190,68 +97,49 @@ const capabilityImplementations = {
   }
 };
 
-// Define REST API endpoints
-app.get('/capabilities', (req, res) => {
-  res.json({ capabilities });
-});
+function toMcpResponse(obj) {
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(obj),
+      },
+    ],
+  };
+}
 
-app.post('/execute/:capability', async (req, res) => {
-  const capability = req.params.capability;
-  const params = req.body;
-  
-  if (!capabilities[capability]) {
-    return res.status(404).json({ error: `Capability '${capability}' not found` });
-  }
-  
-  try {
-    const result = await capabilityImplementations[capability](params);
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+server.tool("get_screen_size", "Gets the screen dimensions", {},
+  async () => toMcpResponse(capabilityImplementations.get_screen_size()));
 
-// WebSocket handling
-wss.on('connection', (ws) => {
-  console.log('Client connected to WebSocket');
-  clients.add(ws);
-  
-  // Send capabilities list to new client
-  ws.send(JSON.stringify({ type: 'capabilities', data: capabilities }));
-  
-  ws.on('message', async (message) => {
-    try {
-      const data = JSON.parse(message);
-      const { type, capability, params, requestId } = data;
-      
-      if (type === 'execute' && capability && capabilityImplementations[capability]) {
-        const result = await capabilityImplementations[capability](params || {});
-        ws.send(JSON.stringify({ type: 'result', requestId, result }));
-      } else {
-        ws.send(JSON.stringify({ 
-          type: 'error', 
-          requestId, 
-          error: `Invalid request or capability '${capability}' not found` 
-        }));
-      }
-    } catch (error) {
-      console.error('Error processing WebSocket message:', error);
-      ws.send(JSON.stringify({ 
-        type: 'error', 
-        error: error.message 
-      }));
-    }
-  });
-  
-  ws.on('close', () => {
-    console.log('Client disconnected from WebSocket');
-    clients.delete(ws);
-  });
-});
+server.tool("screen_capture", "Captures the current screen content", {},
+  async () => toMcpResponse(capabilityImplementations.screen_capture()));
 
-// Start the server
-server.listen(PORT, () => {
-  console.log(`MCP Server running on port ${PORT}`);
-  console.log(`REST API: http://localhost:${PORT}/capabilities`);
-  console.log(`WebSocket: ws://localhost:${PORT}`);
+server.tool("keyboard_press", "Presses a keyboard key or key combination", {
+  key: z.string().describe("Key to press (e.g., 'enter', 'a', 'control')"),
+  modifiers: z.array(z.enum(["control", "shift", "alt", "command"])).default([]).describe("Modifier keys to hold while pressing the key")
+}, async (params) => toMcpResponse(capabilityImplementations.keyboard_press(params)));
+
+server.tool("keyboard_type", "Types text at the current cursor position", {
+  text: z.string().describe("Text to type")
+}, async (params) => toMcpResponse(capabilityImplementations.keyboard_type(params)));
+
+server.tool("mouse_click", "Performs a mouse click", {
+  button: z.enum(["left", "right", "middle"]).default("left").describe("Mouse button to click"),
+  double: z.boolean().default(false).describe("Whether to perform a double click")
+}, async (params) => toMcpResponse(capabilityImplementations.mouse_click(params)));
+
+server.tool("mouse_move", "Moves the mouse to specified coordinates", {
+  x: z.number().describe("X coordinate"),
+  y: z.number().describe("Y coordinate")
+}, async (params) => toMcpResponse(capabilityImplementations.mouse_move(params)));
+
+async function main() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("Robot MCP Server running on stdio");
+}
+
+main().catch((error) => {
+  console.error("Fatal error in main():", error);
+  process.exit(1);
 });
