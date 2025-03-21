@@ -8,8 +8,8 @@ const { z } = require("zod");
 // Create server instance
 const server = new McpServer(
   {
-    name: "robot-mcp",
-    version: "1.0.0",
+    name: "mcp-desktop-automation",
+    version: "0.1.0",
   },
   {
     capabilities: {
