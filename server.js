@@ -30,15 +30,16 @@ const capabilityImplementations = {
       const img = await screenshot();
       const imgInBase64 = img.toString('base64');
       const timestamp = Math.floor(Date.now() / 1000);
+      const screenshotKey = `screenshot-${timestamp}`;
 
-      screenshots[`screenshot-${timestamp}`] = imgInBase64;
+      screenshots[screenshotKey] = imgInBase64;
       await server.server.sendResourceListChanged();
 
       return {
         content: [
           {
             type: "text",
-            text: "Screenshot taken.",
+            text: `Screenshot ${screenshotKey} taken.`,
           },
           {
             type: "image",
