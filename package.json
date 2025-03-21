@@ -1,7 +1,7 @@
 {
-  "name": "mcp-desktop-automation",
+  "name": "mcp-desktop-robot",
   "version": "0.1.0",
-  "description": "Model Context Protocol server for desktop automation",
+  "description": "Model Context Protocol server for desktop robot",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -11,11 +11,12 @@
   "keywords": [
     "mcp",
     "automation",
+    "robot",
     "desktop",
     "screenshot",
     "robotjs"
   ],
-  "author": "",
+  "author": "Adriano Bonat <adrianob@gmail.com>",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.7.0",
