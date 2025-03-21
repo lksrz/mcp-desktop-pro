@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 // Import required packages
 const screenshot = require('screenshot-desktop');
 const robot = require('robotjs');
@@ -9,7 +11,7 @@ const { z } = require("zod");
 const server = new McpServer(
   {
     name: "mcp-desktop-automation",
-    version: "0.1.0",
+    version: "0.1.1",
   },
   {
     capabilities: {

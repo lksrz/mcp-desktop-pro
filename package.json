@@ -1,8 +1,9 @@
 {
   "name": "mcp-desktop-automation",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Model Context Protocol server for desktop automation",
   "main": "server.js",
+  "bin": "./server.js",
   "scripts": {
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
