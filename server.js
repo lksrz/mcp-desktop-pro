@@ -7,11 +7,13 @@ const { McpServer, ResourceTemplate } = require("@modelcontextprotocol/sdk/serve
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const { z } = require("zod");
 
+const packageJson = require('./package.json');
+
 // Create server instance
 const server = new McpServer(
   {
     name: "mcp-desktop-automation",
-    version: "0.1.2",
+    version: packageJson.version,
   },
   {
     capabilities: {
