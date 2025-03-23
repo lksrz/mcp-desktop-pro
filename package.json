@@ -1,6 +1,6 @@
 {
   "name": "mcp-desktop-automation",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Model Context Protocol server for desktop automation",
   "main": "server.js",
   "bin": "./server.js",
@@ -18,6 +18,10 @@
   ],
   "author": "Adriano Bonat <adrianob@gmail.com>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tanob/mcp-desktop-automation.git"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.7.0",
     "axios": "^1.6.2",

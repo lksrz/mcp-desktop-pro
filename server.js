@@ -11,7 +11,7 @@ const { z } = require("zod");
 const server = new McpServer(
   {
     name: "mcp-desktop-automation",
-    version: "0.1.1",
+    version: "0.1.2",
   },
   {
     capabilities: {
