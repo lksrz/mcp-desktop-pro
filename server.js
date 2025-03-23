@@ -102,14 +102,12 @@ const capabilityImplementations = {
     try {
       const { key, modifiers = [] } = params;
 
-      // Hold down modifier keys
-      modifiers.forEach(modifier => robot.keyToggle(modifier, 'down'));
-
-      // Press and release the main key
-      robot.keyTap(key);
-
-      // Release modifier keys
-      modifiers.forEach(modifier => robot.keyToggle(modifier, 'up'));
+      if (modifiers.length === 0) {
+        robot.keyTap(key);
+      } else {
+        robot.keyToggle(key, 'down', modifiers);
+        robot.keyToggle(key, 'up');
+      }
 
       return { success: true };
     } catch (error) {
