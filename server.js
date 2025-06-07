@@ -448,19 +448,62 @@ const capabilityImplementations = {
         return { success: false, error: 'Failed to get window list - activeWin.getOpenWindows() returned null or invalid data' };
       }
       
+      // Get primary screen dimensions for display detection
+      const primaryScreen = robot.getScreenSize();
+      
       return {
         success: true,
-        result: windows.filter(window => window && window.id).map(window => ({
-          id: window.id,
-          title: window.title || 'Untitled',
-          owner: window.owner?.name || 'Unknown',
-          bounds: window.bounds || { x: 0, y: 0, width: 0, height: 0 },
-          processId: window.owner?.processId || 0,
-          bundleId: window.owner?.bundleId || '',
-          path: window.owner?.path || '',
-          url: window.url || '',
-          memoryUsage: window.memoryUsage || 0
-        }))
+        result: windows.filter(window => window && window.id).map(window => {
+          const bounds = window.bounds || { x: 0, y: 0, width: 0, height: 0 };
+          
+          // Determine if window is on primary display or secondary display
+          const isOnPrimaryDisplay = bounds.x >= 0 && 
+                                   bounds.y >= 0 && 
+                                   bounds.x < primaryScreen.width && 
+                                   bounds.y < primaryScreen.height;
+          
+          // Determine display location
+          let displayLocation = 'primary';
+          if (!isOnPrimaryDisplay) {
+            if (bounds.x < 0) {
+              displayLocation = 'secondary-left';
+            } else if (bounds.x >= primaryScreen.width) {
+              displayLocation = 'secondary-right';
+            } else if (bounds.y < 0) {
+              displayLocation = 'secondary-top';
+            } else if (bounds.y >= primaryScreen.height) {
+              displayLocation = 'secondary-bottom';
+            } else {
+              displayLocation = 'secondary-unknown';
+            }
+          }
+          
+          // Determine accessibility for mouse/keyboard actions
+          // Note: Mouse movement works across all displays when using windowInsideCoordinates
+          const isAccessibleForMouse = true; // Mouse works across displays with window-relative coordinates
+          const isAccessibleForWindowActions = true; // focus_window and window_capture work across displays
+          
+          return {
+            id: window.id,
+            title: window.title || 'Untitled',
+            owner: window.owner?.name || 'Unknown',
+            bounds: bounds,
+            processId: window.owner?.processId || 0,
+            bundleId: window.owner?.bundleId || '',
+            path: window.owner?.path || '',
+            url: window.url || '',
+            memoryUsage: window.memoryUsage || 0,
+            displayLocation: displayLocation,
+            isOnPrimaryDisplay: isOnPrimaryDisplay,
+            accessibility: {
+              mouseActions: isAccessibleForMouse,
+              windowActions: isAccessibleForWindowActions,
+              note: isOnPrimaryDisplay ? 
+                'All coordinate systems available' : 
+                'Use windowInsideCoordinates for reliable cross-display mouse control'
+            }
+          };
+        })
       };
     } catch (error) {
       console.error('Error listing windows:', error);
@@ -765,7 +808,7 @@ server.tool("mouse_move", "Moves the mouse to specified coordinates. Automatical
   }
 });
 
-server.tool("list_windows", "Lists all open windows with their properties", {},
+server.tool("list_windows", "Lists all open windows with their properties, including multi-display detection and accessibility flags", {},
   async () => toMcpResponse(await capabilityImplementations.list_windows()));
 
 server.tool("focus_window", "Focuses on a specific window to bring it to the front", {

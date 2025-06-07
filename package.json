@@ -1,7 +1,7 @@
 {
   "name": "mcp-desktop-pro",
-  "version": "0.1.6",
-  "description": "Advanced MCP server for desktop automation with intelligent window management, window-relative coordinates, visual debugging, and Retina display support",
+  "version": "0.2.0",
+  "description": "Advanced MCP server for desktop automation with intelligent window management, multi-action chaining, window-relative coordinates, visual debugging, and Retina display support",
   "main": "server.js",
   "bin": "./server.js",
   "scripts": {
@@ -10,22 +10,19 @@
   },
   "keywords": [
     "mcp",
+    "modelcontextprotocol",
     "automation",
-    "robot",
     "desktop",
+    "testing",
     "screenshot",
     "robotjs",
-    "window-management",
-    "retina",
-    "visual-debugging",
-    "macos",
-    "applescript"
+    "visual-debugging"
   ],
   "author": "Lukasz Rzepecki <http://linkedin.com/in/lukaszrzepecki/>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lukaszrzepecki/mcp-desktop-pro.git"
+    "url": "https://github.com/lksrz/mcp-desktop-pro"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.7.0",

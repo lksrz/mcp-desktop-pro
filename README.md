@@ -409,6 +409,9 @@ When using `windowInsideCoordinates: true`:
 
 - **macOS**: Recommended (full AppleScript support)
 - **Node.js**: >=14.x
+- **Python**: >=3.8 with build tools (required for robotjs compilation)
+  - Install with: `pip3 install setuptools` (for Python 3.12+)
+  - Or use Python 3.8-3.11 which include distutils by default
 - **Permissions**: Screen recording, accessibility, automation permissions required
 
 ## Performance Optimizations
@@ -427,12 +430,39 @@ When using `windowInsideCoordinates: true`:
 - **WebP format**: 25-35% smaller than equivalent JPEG
 - **Quality 40**: Optimal balance between file size and AI readability
 
+## Multi-Display Support
+
+✅ **Full multi-display automation support!**
+- **Window detection**: Finds windows across all displays
+- **Window capture**: Screenshots windows on any display  
+- **Window focusing**: Brings windows to front on any display
+- **Cross-display mouse control**: Mouse movement works across all displays using `windowInsideCoordinates`
+- **Cross-display automation**: All tools work with windows on secondary displays
+
+**Best practices for multi-display setups:**
+- Use `list_windows()` to see display location (`displayLocation` field)
+- Use `windowInsideCoordinates: true` for reliable cross-display mouse positioning
+- Use `window_capture()` to get screenshots of windows on any display
+
 ## Limitations
 
+- **Screen capture**: Only captures primary display (use `window_capture()` for secondary displays)
+- **Direct coordinate mouse control**: Limited to primary display (use `windowInsideCoordinates` for cross-display)
 - Primarily tested with Claude Desktop, Claude Code and Cursor
 - macOS optimized (Windows/Linux may have limited window management features)
 
 ## Troubleshooting
+
+### Installation Issues
+
+**Error: `ModuleNotFoundError: No module named 'distutils'`**
+- This occurs with Python 3.12+ when installing robotjs
+- Solution: `pip3 install setuptools`
+- Alternative: Use Python 3.8-3.11 with pyenv
+
+**robotjs compilation fails**
+- Ensure you have Xcode Command Line Tools: `xcode-select --install`
+- On Linux: Install build-essential and python3-dev
 
 ### Screenshots Too Large
 - Use coordinate-based cropping: `screen_capture({ x1: 0, y1: 0, x2: 800, y2: 600 })`
