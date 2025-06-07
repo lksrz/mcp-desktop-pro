@@ -86,9 +86,9 @@ const capabilityImplementations = {
       const currentWidth = currentMeta.width;
       const currentHeight = currentMeta.height;
       
-      // Scale to 50% of original size, but cap at 1920x1080
-      const targetWidth = Math.min(Math.round(currentWidth * 0.5), 1920);
-      const targetHeight = Math.min(Math.round(currentHeight * 0.5), 1080);
+      // Scale to 50% of original size, but cap at 1280x720 for much smaller responses
+      const targetWidth = Math.min(Math.round(currentWidth * 0.5), 1280);
+      const targetHeight = Math.min(Math.round(currentHeight * 0.5), 720);
       
       // Only resize if the target is smaller than current
       if (targetWidth < currentWidth || targetHeight < currentHeight) {
@@ -98,8 +98,14 @@ const capabilityImplementations = {
         });
       }
       
-      // Apply aggressive WebP compression for AI processing
-      img = await sharpInstance.webp({ quality: 40, effort: 0 }).toBuffer();
+      // Apply very aggressive WebP compression for AI processing
+      img = await sharpInstance.webp({ quality: 15, effort: 0 }).toBuffer();
+      
+      // Check final size and abort if too large (stay well under 1MB limit)
+      const sizeKB = img.length / 1024;
+      if (sizeKB > 300) {
+        return { success: false, error: `Screenshot too large: ${sizeKB.toFixed(1)}KB (max 300KB). Try capturing a smaller area or window.` };
+      }
       
       const imgInBase64 = img.toString('base64');
       const timestamp = Math.floor(Date.now() / 1000);
@@ -123,7 +129,7 @@ const capabilityImplementations = {
         isError: false
       };
     } catch (error) {
-      console.error('Error capturing screen:', error);
+      // Error captured silently to avoid interfering with MCP protocol
       return { success: false, error: error.message };
     }
   },
@@ -148,7 +154,9 @@ const capabilityImplementations = {
       
       // Account for our 50% screenshot scaling
       // When AI analyzes screenshots, they see 50% scaled images
-      // So coordinates from AI need to be doubled to match actual screen positions
+      // So coordinates from AI need to be doubled to match the original screenshot resolution
+      // But on Retina displays, the original screenshot is already 2x logical resolution
+      // So we need to account for both scaling factors properly
       const screenshotScaleFactor = 2.0; // We always scale screenshots to 50%
       
       // If coordinates are relative to a window (windowInsideCoordinates=true),
@@ -171,29 +179,30 @@ const capabilityImplementations = {
           return { success: false, error: `Window not found for coordinate conversion with ID: ${windowId}` };
         }
         
-        // First scale coordinates for screenshot scaling (AI sees 50% scaled images)
+        // Scale coordinates for screenshot scaling (AI sees 50% scaled images)
+        // Multiply by 2 to convert from AI coordinates to logical coordinates
         let scaledX = Math.round(x * screenshotScaleFactor);
         let scaledY = Math.round(y * screenshotScaleFactor);
         
-        // Then scale for Retina if needed
-        if (isRetina) {
-          scaledX = Math.round(scaledX / scaleX);
-          scaledY = Math.round(scaledY / scaleY);
-        }
+        // No additional Retina scaling needed - robot.moveMouse expects logical coordinates
+        // and window bounds are already in logical coordinate space
         
         // Then add window position to scaled coordinates
         moveX = scaledX + targetWindow.bounds.x;
         moveY = scaledY + targetWindow.bounds.y;
       } else {
-        // For regular screen coordinates, apply screenshot scaling first
+        // For regular screen coordinates, apply screenshot scaling to get back to logical coordinates
+        // AI coordinates are from 50% scaled screenshots, so multiply by 2 to get logical coordinates
+        // robot.moveMouse expects logical coordinates, not physical pixel coordinates
         moveX = Math.round(moveX * screenshotScaleFactor);
         moveY = Math.round(moveY * screenshotScaleFactor);
         
-        // Then apply Retina scaling if needed
-        if (isRetina) {
-          moveX = Math.round(moveX / scaleX);
-          moveY = Math.round(moveY / scaleY);
-        }
+        // No additional Retina scaling needed because:
+        // 1. Screenshot is captured at physical resolution (e.g., 2880x1800)
+        // 2. Scaled to 50% for AI (e.g., 1440x900) 
+        // 3. AI gives coordinates relative to scaled image (e.g., x=1135 in 1440x900 image)
+        // 4. Multiply by 2 to get logical coordinates (e.g., x=2270 in 1440x900 logical space)
+        // 5. robot.moveMouse() handles the conversion to physical coordinates internally
       }
       
       robot.moveMouse(moveX, moveY);
@@ -290,7 +299,7 @@ const capabilityImplementations = {
       
       return { success: true };
     } catch (error) {
-      console.error('Error moving mouse:', error);
+      // Error captured silently to avoid interfering with MCP protocol
       return { success: false, error: error.message };
     }
   },
@@ -355,7 +364,7 @@ const capabilityImplementations = {
 
       return { success: true };
     } catch (error) {
-      console.error('Error clicking mouse:', error);
+      // Error captured silently to avoid interfering with MCP protocol
       return { success: false, error: error.message };
     }
   },
@@ -377,7 +386,7 @@ const capabilityImplementations = {
       robot.typeString(text);
       return { success: true };
     } catch (error) {
-      console.error('Error typing text:', error);
+      // Error captured silently to avoid interfering with MCP protocol
       return { success: false, error: error.message };
     }
   },
@@ -424,7 +433,7 @@ const capabilityImplementations = {
 
       return { success: true };
     } catch (error) {
-      console.error('Error pressing key:', error);
+      // Error captured silently to avoid interfering with MCP protocol
       return { success: false, error: error.message };
     }
   },
@@ -434,7 +443,7 @@ const capabilityImplementations = {
       const size = robot.getScreenSize();
       return { success: true, result: size };
     } catch (error) {
-      console.error('Error getting screen size:', error);
+      // Error captured silently to avoid interfering with MCP protocol
       return { success: false, error: error.message };
     }
   },
@@ -506,7 +515,7 @@ const capabilityImplementations = {
         })
       };
     } catch (error) {
-      console.error('Error listing windows:', error);
+      // Error captured silently to avoid interfering with MCP protocol
       return { success: false, error: error.message };
     }
   },
@@ -550,7 +559,7 @@ const capabilityImplementations = {
         }
       }
     } catch (error) {
-      console.error('Error focusing window:', error);
+      // Error captured silently to avoid interfering with MCP protocol
       return { success: false, error: error.message };
     }
   },
@@ -605,33 +614,175 @@ const capabilityImplementations = {
       
       // Use the window bounds to capture just that window
       const bounds = targetWindow.bounds;
-      const captureParams = {
-        x1: bounds.x,
-        y1: bounds.y,
-        x2: bounds.x + bounds.width,
-        y2: bounds.y + bounds.height
-      };
       
-      // Use existing screen_capture functionality with window bounds
-      const result = await capabilityImplementations.screen_capture(captureParams);
-      
-      if (result.isError === false) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Window "${targetWindow.title}" captured successfully.`,
-            },
-            ...result.content.slice(1) // Include the image but update the text
-          ],
-          isError: false
-        };
-      } else {
-        return result;
+      // Validate bounds before proceeding
+      if (!bounds || typeof bounds.x !== 'number' || typeof bounds.y !== 'number' || 
+          typeof bounds.width !== 'number' || typeof bounds.height !== 'number') {
+        return { success: false, error: `Invalid window bounds: ${JSON.stringify(bounds)}` };
       }
       
+      if (bounds.width <= 0 || bounds.height <= 0) {
+        return { success: false, error: `Invalid window dimensions: ${bounds.width}x${bounds.height}` };
+      }
+      
+      
+      // Check if window is on secondary display - not supported yet
+      // We need to calculate isOnPrimaryDisplay like in list_windows since the raw window object doesn't have this
+      const primaryScreen = robot.getScreenSize();
+      const isOnPrimaryDisplay = bounds.x >= 0 && 
+                               bounds.y >= 0 && 
+                               bounds.x < primaryScreen.width && 
+                               bounds.y < primaryScreen.height;
+      
+      if (!isOnPrimaryDisplay) {
+        // Determine display location for error message
+        let displayLocation = 'primary';
+        if (bounds.x < 0) {
+          displayLocation = 'secondary-left';
+        } else if (bounds.x >= primaryScreen.width) {
+          displayLocation = 'secondary-right';
+        } else if (bounds.y < 0) {
+          displayLocation = 'secondary-top';
+        } else if (bounds.y >= primaryScreen.height) {
+          displayLocation = 'secondary-bottom';
+        } else {
+          displayLocation = 'secondary-unknown';
+        }
+        
+        return { 
+          success: false, 
+          error: `Window capture on secondary displays is not yet implemented. Window "${targetWindow.title}" is on ${displayLocation} display. Only primary display windows can be captured.` 
+        };
+      }
+      
+      // Capture primary display only
+      let img;
+      try {
+        img = await screenshot({ format: 'jpg' });
+      } catch (screenshotError) {
+        return { success: false, error: `Screenshot failed: ${screenshotError.message}` };
+      }
+      
+      const sharp = require('sharp');
+      let metadata;
+      try {
+        metadata = await sharp(img).metadata();
+      } catch (sharpError) {
+        return { success: false, error: `Image processing failed: ${sharpError.message}` };
+      }
+      
+      const screenSize = robot.getScreenSize();
+      
+      // Calculate scaling factor for Retina detection
+      const scaleX = metadata.width / screenSize.width;
+      const scaleY = metadata.height / screenSize.height;
+      const isHighDPI = scaleX > 1.5 || scaleY > 1.5;
+      
+      let sharpInstance = sharp(img);
+      
+      // Extract window area from the screenshot
+      let scaledX1, scaledY1, scaledX2, scaledY2;
+      
+      if (isHighDPI) {
+        // Apply scaling for high-DPI displays (Retina)
+        scaledX1 = Math.round(bounds.x * scaleX);
+        scaledY1 = Math.round(bounds.y * scaleY);
+        scaledX2 = Math.round((bounds.x + bounds.width) * scaleX);
+        scaledY2 = Math.round((bounds.y + bounds.height) * scaleY);
+      } else {
+        // Use coordinates as-is for standard displays
+        scaledX1 = bounds.x;
+        scaledY1 = bounds.y;
+        scaledX2 = bounds.x + bounds.width;
+        scaledY2 = bounds.y + bounds.height;
+      }
+      
+      // Note: Secondary display support removed - coordinates are for primary display only
+      
+      const width = scaledX2 - scaledX1;
+      const height = scaledY2 - scaledY1;
+      
+      if (width <= 0 || height <= 0) {
+        return { success: false, error: 'Invalid window bounds: width and height must be positive' };
+      }
+      
+      
+      // Validate extraction bounds against image dimensions
+      if (scaledX1 < 0 || scaledY1 < 0 || scaledX2 > metadata.width || scaledY2 > metadata.height) {
+        return { success: false, error: `Window bounds (${scaledX1},${scaledY1},${scaledX2},${scaledY2}) exceed screenshot dimensions (${metadata.width}x${metadata.height})` };
+      }
+      
+      try {
+        sharpInstance = sharpInstance.extract({
+          left: scaledX1,
+          top: scaledY1,
+          width: width,
+          height: height
+        });
+      } catch (extractError) {
+        return { success: false, error: `Window extraction failed: ${extractError.message}. Bounds: (${scaledX1},${scaledY1}) ${width}x${height}` };
+      }
+      
+      // Apply AI optimization
+      let currentMeta;
+      try {
+        currentMeta = await sharpInstance.metadata();
+      } catch (metaError) {
+        return { success: false, error: `Metadata extraction failed: ${metaError.message}` };
+      }
+      
+      const currentWidth = currentMeta.width;
+      const currentHeight = currentMeta.height;
+      
+      // Scale to 50% of original size, but cap at 1280x720 for much smaller responses
+      const targetWidth = Math.min(Math.round(currentWidth * 0.5), 1280);
+      const targetHeight = Math.min(Math.round(currentHeight * 0.5), 720);
+      
+      // Only resize if the target is smaller than current
+      if (targetWidth < currentWidth || targetHeight < currentHeight) {
+        try {
+          sharpInstance = sharpInstance.resize(targetWidth, targetHeight, {
+            fit: 'inside',
+            withoutEnlargement: true
+          });
+        } catch (resizeError) {
+          return { success: false, error: `Resize failed: ${resizeError.message}` };
+        }
+      }
+      
+      // Convert to WebP with very aggressive compression for AI analysis
+      try {
+        img = await sharpInstance
+          .webp({ quality: 15, effort: 0 })
+          .toBuffer();
+      } catch (webpError) {
+        return { success: false, error: `WebP conversion failed: ${webpError.message}` };
+      }
+      
+      // Check final size and abort if too large (stay well under 1MB limit)
+      const sizeKB = img.length / 1024;
+      if (sizeKB > 300) {
+        return { success: false, error: `Window capture too large: ${sizeKB.toFixed(1)}KB (max 300KB). Try a smaller window.` };
+      }
+      
+      const base64 = img.toString('base64');
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Window "${targetWindow.title}" captured successfully.`,
+          },
+          {
+            type: "image",
+            data: `data:image/webp;base64,${base64}`,
+            mimeType: "image/webp"
+          }
+        ],
+        isError: false
+      };
+      
     } catch (error) {
-      console.error('Error capturing window:', error);
+      // Error captured silently to avoid interfering with MCP protocol
       return { success: false, error: error.message };
     }
   },
@@ -744,7 +895,7 @@ const capabilityImplementations = {
         ...(hasErrors && { errors: errors })
       };
     } catch (error) {
-      console.error('Error executing multiple desktop actions:', error);
+      // Error captured silently to avoid interfering with MCP protocol
       return { success: false, error: error.message };
     }
   }
@@ -764,7 +915,7 @@ function toMcpResponse(obj) {
 server.tool("get_screen_size", "Gets the screen dimensions", {},
   async () => toMcpResponse(capabilityImplementations.get_screen_size()));
 
-server.tool("screen_capture", "Captures the current screen content (automatically optimized for AI analysis)", {
+server.tool("screen_capture", "Captures the current screen content (PRIMARY DISPLAY ONLY - cannot capture secondary/external displays. Use window_capture for windows on secondary displays. Automatically optimized for AI analysis)", {
   x1: z.number().optional().describe("Left X coordinate for partial capture"),
   y1: z.number().optional().describe("Top Y coordinate for partial capture"),
   x2: z.number().optional().describe("Right X coordinate for partial capture"),
@@ -815,7 +966,7 @@ server.tool("focus_window", "Focuses on a specific window to bring it to the fro
   windowId: z.number().describe("The ID of the window to focus (from list_windows)")
 }, async (params) => toMcpResponse(await capabilityImplementations.focus_window(params)));
 
-server.tool("window_capture", "Focuses on a window and captures a screenshot of just that window (automatically optimized for AI analysis)", {
+server.tool("window_capture", "Focuses on a window and captures a screenshot of just that window (LIMITATION: coordinate handling for secondary displays not fully implemented - may not work reliably on non-primary displays. Automatically optimized for AI analysis)", {
   windowId: z.number().optional().describe("The ID of the window to capture (from list_windows)"),
   windowTitle: z.string().optional().describe("The title of the window to capture (alternative to windowId)")
 }, async (params) => {
@@ -854,7 +1005,6 @@ server.resource(
     };
 
     server.server.sendLoggingMessage({level: "info", data: `Returned ${JSON.stringify(result)}`});
-    console.error(`Returned ${JSON.stringify(result)}`);
     return result;
   }
 );
@@ -874,7 +1024,7 @@ server.resource(
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("Robot MCP Server running on stdio");
+  // MCP Server running on stdio - logging removed to avoid protocol interference
 }
 
 main().catch((error) => {

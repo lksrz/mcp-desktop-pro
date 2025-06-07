@@ -6,9 +6,13 @@ An advanced Model Context Protocol server for comprehensive desktop automation w
 
 - 🪟 **Advanced Window Management**: Target specific windows with precise coordinate conversion and AppleScript integration
 - ⚡ **Multi-Action Chaining**: Execute complex automation sequences with timing control and error handling
-- 🖼️ **AI-Optimized Screenshots**: Automatic compression, scaling, and WebP format for faster AI processing
+- 🖼️ **AI-Optimized Screenshots**: Aggressive compression, scaling, and WebP format optimized for small response sizes
 - 🍎 **Native macOS Support**: Seamless integration with macOS window system and Retina displays
 - 🎯 **Visual Debugging**: Real-time cursor position verification with visual feedback
+
+## ⚠️ Important Limitation
+
+**Secondary Display Screenshots**: AI agents cannot capture screenshots of windows on secondary/external displays. Both `screen_capture` and `window_capture` only work on the primary display. Mouse/keyboard automation still works across all displays using window-relative coordinates.
 
 ## Configuration to use MCP Desktop Pro
 
@@ -54,7 +58,7 @@ When first running this MCP server, you may need to grant these permissions in y
 
 ## Key Features
 
-- **AI-Optimized Screenshots**: Automatic 50% scaling, WebP compression, and size capping for optimal AI processing
+- **AI-Optimized Screenshots**: Aggressive 50% scaling, WebP compression (quality 15), and strict size limits (max 300KB) for optimal response sizes
 - **Multi-Action Automation**: Execute sequences of actions with precise timing control and configurable error handling
 - **Advanced Window Management**: List, focus, capture, and precisely target specific windows with intelligent window detection
 - **Window-Relative Coordinates**: Click elements within specific windows accurately with automatic coordinate transformation
@@ -75,10 +79,11 @@ When first running this MCP server, you may need to grant these permissions in y
   - Returns: `{ width, height }` in logical coordinates
 
 - **screen_capture**
-  - Captures the current screen content (automatically optimized for AI analysis)
+  - Captures the current screen content (PRIMARY DISPLAY ONLY - cannot capture secondary/external displays)
   - Inputs:
     - `x1`, `y1`, `x2`, `y2` (numbers, optional): Coordinates for partial capture
   - Features: Automatic Retina scaling, 50% scaling with 1920x1080 cap, WebP compression (quality 40)
+  - ⚠️ **Limitation**: Only works on primary display - use `window_capture` for windows on secondary displays
 
 - **list_windows**
   - Lists all open windows with their properties
@@ -95,6 +100,7 @@ When first running this MCP server, you may need to grant these permissions in y
     - `windowId` (number, optional): Window ID from list_windows
     - `windowTitle` (string, optional): Window title (partial match)
   - Features: Automatic focusing, precise window bounds capture, 50% scaling with WebP compression
+  - ⚠️ **Secondary display limitation**: Coordinate handling for windows on secondary displays not fully implemented
 
 #### Mouse Control
 
@@ -434,19 +440,21 @@ When using `windowInsideCoordinates: true`:
 
 ✅ **Full multi-display automation support!**
 - **Window detection**: Finds windows across all displays
-- **Window capture**: Screenshots windows on any display  
+- **Window capture**: ⚠️ Limited to primary display only  
 - **Window focusing**: Brings windows to front on any display
 - **Cross-display mouse control**: Mouse movement works across all displays using `windowInsideCoordinates`
-- **Cross-display automation**: All tools work with windows on secondary displays
+- **Cross-display automation**: Window management and mouse/keyboard actions work with windows on secondary displays
 
 **Best practices for multi-display setups:**
 - Use `list_windows()` to see display location (`displayLocation` field)
 - Use `windowInsideCoordinates: true` for reliable cross-display mouse positioning
-- Use `window_capture()` to get screenshots of windows on any display
+- ⚠️ **Screenshot limitation**: Neither `screen_capture()` nor `window_capture()` can capture windows on secondary displays
+- For secondary display automation, you can focus windows and perform mouse/keyboard actions, but cannot visually inspect them
 
 ## Limitations
 
-- **Screen capture**: Only captures primary display (use `window_capture()` for secondary displays)
+- **Screenshot capture**: Both `screen_capture()` and `window_capture()` are limited to primary display only
+- **Secondary display support**: AI agents cannot "see" or capture screenshots of windows on secondary/external displays
 - **Direct coordinate mouse control**: Limited to primary display (use `windowInsideCoordinates` for cross-display)
 - Primarily tested with Claude Desktop, Claude Code and Cursor
 - macOS optimized (Windows/Linux may have limited window management features)
@@ -463,6 +471,47 @@ When using `windowInsideCoordinates: true`:
 **robotjs compilation fails**
 - Ensure you have Xcode Command Line Tools: `xcode-select --install`
 - On Linux: Install build-essential and python3-dev
+
+### Node.js Version Mismatch
+
+**Error: `The module '...robotjs.node' was compiled against a different Node.js version using NODE_MODULE_VERSION X. This version of Node.js requires NODE_MODULE_VERSION Y.`**
+
+This error occurs when Claude Desktop uses a different Node.js version than the one used to install the dependencies.
+
+**Solution:**
+1. Check which Node.js version you're using: `which node && node --version`
+2. Update your Claude Desktop configuration to use the specific Node.js path:
+   ```json
+   {
+     "mcpServers": {
+       "desktop-pro": {
+         "command": "/full/path/to/your/node",
+         "args": ["/path/to/mcp-desktop-pro/server.js"]
+       }
+     }
+   }
+   ```
+   
+   **Example for nvm users:**
+   ```json
+   {
+     "mcpServers": {
+       "desktop-pro": {
+         "command": "/Users/username/.nvm/versions/node/v22.16.0/bin/node",
+         "args": ["/path/to/mcp-desktop-pro/server.js"]
+       }
+     }
+   }
+   ```
+
+3. If the error persists, rebuild the native modules:
+   ```bash
+   cd /path/to/mcp-desktop-pro
+   rm -rf node_modules package-lock.json
+   npm install
+   ```
+
+4. Restart Claude Desktop after making configuration changes.
 
 ### Screenshots Too Large
 - Use coordinate-based cropping: `screen_capture({ x1: 0, y1: 0, x2: 800, y2: 600 })`
