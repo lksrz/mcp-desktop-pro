@@ -1,7 +1,7 @@
 {
   "name": "mcp-desktop-pro",
   "version": "0.1.6",
-  "description": "Advanced MCP server for desktop automation with window management, visual debugging, and Retina display support",
+  "description": "Advanced MCP server for desktop automation with intelligent window management, window-relative coordinates, visual debugging, and Retina display support",
   "main": "server.js",
   "bin": "./server.js",
   "scripts": {

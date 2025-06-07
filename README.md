@@ -1,9 +1,14 @@
 # MCP Desktop Pro
 
-An advanced Model Context Protocol server for comprehensive desktop automation with window management, visual debugging, and Retina display support. This server enables LLMs to control mouse movements, keyboard inputs, capture screenshots, manage windows, and perform precise automation tasks with visual feedback.
+An advanced Model Context Protocol server for comprehensive desktop automation with **advanced window management**, visual debugging, and Retina display support. This server enables LLMs to intelligently control mouse movements, keyboard inputs, capture screenshots, **manage and target specific windows**, and perform precise automation tasks with visual feedback and window-relative coordinate systems.
 
-**Based on**: [mcp-desktop-automation](https://github.com/tanob/mcp-desktop-automation) by Adriano Bonat  
-**Enhanced by**: Lukasz Rzepecki ([LinkedIn](http://linkedin.com/in/lukaszrzepecki/))
+## 🚀 Main Advantages
+
+- 🪟 **Advanced Window Management**: Target specific windows with precise coordinate conversion and AppleScript integration
+- ⚡ **Multi-Action Chaining**: Execute complex automation sequences with timing control and error handling
+- 🖼️ **AI-Optimized Screenshots**: Automatic compression, scaling, and WebP format for faster AI processing
+- 🍎 **Native macOS Support**: Seamless integration with macOS window system and Retina displays
+- 🎯 **Visual Debugging**: Real-time cursor position verification with visual feedback
 
 ## Configuration to use MCP Desktop Pro
 
@@ -45,16 +50,16 @@ This server requires system-level permissions to:
 * Access window information and focus windows
 * Execute AppleScript commands (macOS)
 
-When first running Claude Desktop with this server, you may need to grant these permissions in your operating system's security settings.
+When first running this MCP server, you may need to grant these permissions in your operating system's security settings.
 
 ## Key Features
 
 - **AI-Optimized Screenshots**: Automatic 50% scaling, WebP compression, and size capping for optimal AI processing
 - **Multi-Action Automation**: Execute sequences of actions with precise timing control and configurable error handling
-- **Advanced Window Management**: List, focus, and capture specific windows
+- **Advanced Window Management**: List, focus, capture, and precisely target specific windows with intelligent window detection
+- **Window-Relative Coordinates**: Click elements within specific windows accurately with automatic coordinate transformation
 - **Visual Debugging**: Mouse position verification with red circle overlay
 - **Retina Display Support**: Automatic scaling detection and coordinate conversion
-- **Window-Relative Coordinates**: Click elements within specific windows accurately
 - **Press Duration Control**: Hold keys or mouse buttons for specified durations
 - **WebP Format**: Optimized WebP format for better compression and faster AI processing
 - **AppleScript Integration**: Reliable window focusing on macOS
@@ -132,7 +137,7 @@ When first running Claude Desktop with this server, you may need to grant these 
 #### Multi-Action Automation
 
 - **multiple_desktop_actions**
-  - Executes a sequence of desktop actions with optional delays and error handling
+  - Action chaining: executes a sequence of desktop actions with optional delays and error handling
   - Inputs:
     - `actions` (array, required): Array of action objects
     - `continueOnError` (boolean, optional, default: false): Continue executing remaining actions even if one fails
@@ -392,12 +397,6 @@ The server automatically handles multiple scaling factors:
 - **Mouse coordinates**: Automatically scaled up 2x to account for 50% screenshot scaling
 - **Window coordinates**: Properly scaled for accurate positioning
 
-**Example coordinate flow:**
-1. **AI sees**: Button at (150, 200) in 50% scaled screenshot
-2. **System calculates**: (150, 200) × 2 = (300, 400) actual screen coordinates
-3. **Retina adjustment**: If needed, (300, 400) ÷ 2 = (150, 200) logical coordinates
-4. **Mouse moves**: To correct position (150, 200)
-
 ### Window-Relative Coordinates
 When using `windowInsideCoordinates: true`:
 1. Coordinates are relative to the window's top-left corner (0,0)
@@ -422,7 +421,7 @@ When using `windowInsideCoordinates: true`:
 - **Efficient Scaling**: Automatic Retina detection minimizes unnecessary processing
 - **Size Limits**: Optimized to stay well under 1MB response limits
 
-### Optimization Details:
+### Screenshot Optimization Details:
 - **Original 4K screenshot**: ~8MB → **Optimized**: ~200KB (40x smaller!)
 - **Retina display handling**: Automatic scaling factor detection
 - **WebP format**: 25-35% smaller than equivalent JPEG
@@ -430,9 +429,8 @@ When using `windowInsideCoordinates: true`:
 
 ## Limitations
 
-- Primarily tested with Claude Desktop
+- Primarily tested with Claude Desktop, Claude Code and Cursor
 - macOS optimized (Windows/Linux may have limited window management features)
-- AppleScript required for reliable window focusing on macOS
 
 ## Troubleshooting
 
@@ -442,15 +440,12 @@ When using `windowInsideCoordinates: true`:
 
 ### Mouse Positioning Issues
 - Use `debug: true` in `mouse_move` for visual verification
-- Check if Retina scaling is being applied correctly
 - Use `windowInsideCoordinates` for window-relative positioning
 - For `mouse_click` with coordinates: same coordinate logic as `mouse_move` applies
 - Screenshot coordinates are automatically scaled 2x to account for 50% image scaling
 
 ### Window Focus Problems
-- Ensure proper permissions are granted
 - Use `windowId` from `list_windows` for accurate targeting
-- AppleScript integration handles most macOS window management
 
 ## Credits
 
