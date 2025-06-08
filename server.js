@@ -187,17 +187,20 @@ const capabilityImplementations = {
         const windowLogicalWidth = targetWindow.bounds.width;
         const windowLogicalHeight = targetWindow.bounds.height;
         
-        console.error(`MOUSE_MOVE DEBUG: Window logical size: ${windowLogicalWidth}x${windowLogicalHeight}`);
-        console.error(`MOUSE_MOVE DEBUG: Window position: (${targetWindow.bounds.x}, ${targetWindow.bounds.y})`);
-        console.error(`MOUSE_MOVE DEBUG: Screen size: ${screenSize.width}x${screenSize.height}`);
-        console.error(`MOUSE_MOVE DEBUG: Screenshot metadata: ${metadata.width}x${metadata.height}`);
+        const fs = require('fs');
+        const timestamp = new Date().toISOString();
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `\n=== MOUSE_MOVE DEBUG ${timestamp} ===\n`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Window logical size: ${windowLogicalWidth}x${windowLogicalHeight}\n`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Window position: (${targetWindow.bounds.x}, ${targetWindow.bounds.y})\n`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Screen size: ${screenSize.width}x${screenSize.height}\n`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Screenshot metadata: ${metadata.width}x${metadata.height}\n`);
         
         // Calculate retina scaling
         const isHighDPI = (metadata.width / screenSize.width) > 1.5 || (metadata.height / screenSize.height) > 1.5;
         const scaleX = metadata.width / screenSize.width;
         const scaleY = metadata.height / screenSize.height;
         
-        console.error(`MOUSE_MOVE DEBUG: Retina detection: isHighDPI=${isHighDPI}, scaleX=${scaleX.toFixed(3)}, scaleY=${scaleY.toFixed(3)}`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Retina detection: isHighDPI=${isHighDPI}, scaleX=${scaleX.toFixed(3)}, scaleY=${scaleY.toFixed(3)}\n`);
         
         let windowPhysicalWidth, windowPhysicalHeight;
         if (isHighDPI) {
@@ -208,13 +211,13 @@ const capabilityImplementations = {
           windowPhysicalHeight = windowLogicalHeight;
         }
         
-        console.error(`MOUSE_MOVE DEBUG: Window physical size: ${windowPhysicalWidth}x${windowPhysicalHeight}`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Window physical size: ${windowPhysicalWidth}x${windowPhysicalHeight}\n`);
         
         // What window_capture should produce
         const targetWindowWidth = Math.min(Math.round(windowPhysicalWidth * 0.5), 1280);
         const targetWindowHeight = Math.min(Math.round(windowPhysicalHeight * 0.5), 720);
         
-        console.error(`MOUSE_MOVE DEBUG: Expected AI window size: ${targetWindowWidth}x${targetWindowHeight}`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Expected AI window size: ${targetWindowWidth}x${targetWindowHeight}\n`);
         
         // But based on previous debug output, AI sees something different
         // Let's try different assumptions and see which matches the 2.0 scale factor
@@ -223,11 +226,11 @@ const capabilityImplementations = {
         const assumption3_Width = targetWindowWidth; // AI sees expected scaled size
         const assumption4_Width = windowLogicalWidth / 2; // AI sees half logical
         
-        console.error(`MOUSE_MOVE DEBUG: Testing scale factor assumptions:`);
-        console.error(`  - If AI sees logical (${assumption1_Width}): scale = ${(windowLogicalWidth / assumption1_Width).toFixed(3)}`);
-        console.error(`  - If AI sees physical (${assumption2_Width}): scale = ${(windowLogicalWidth / assumption2_Width).toFixed(3)}`);
-        console.error(`  - If AI sees expected (${assumption3_Width}): scale = ${(windowLogicalWidth / assumption3_Width).toFixed(3)}`);
-        console.error(`  - If AI sees half logical (${assumption4_Width}): scale = ${(windowLogicalWidth / assumption4_Width).toFixed(3)}`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Testing scale factor assumptions:\n`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - If AI sees logical (${assumption1_Width}): scale = ${(windowLogicalWidth / assumption1_Width).toFixed(3)}\n`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - If AI sees physical (${assumption2_Width}): scale = ${(windowLogicalWidth / assumption2_Width).toFixed(3)}\n`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - If AI sees expected (${assumption3_Width}): scale = ${(windowLogicalWidth / assumption3_Width).toFixed(3)}\n`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - If AI sees half logical (${assumption4_Width}): scale = ${(windowLogicalWidth / assumption4_Width).toFixed(3)}\n`);
         
         // Use the assumption that gives us the 2.0 scale factor we observed
         const actualAiWindowWidth = windowLogicalWidth / 2;
@@ -236,22 +239,22 @@ const capabilityImplementations = {
         const windowAiToLogicalScaleX = windowLogicalWidth / actualAiWindowWidth;
         const windowAiToLogicalScaleY = windowLogicalHeight / actualAiWindowHeight;
         
-        console.error(`MOUSE_MOVE DEBUG: Using AI window size: ${actualAiWindowWidth}x${actualAiWindowHeight}`);
-        console.error(`MOUSE_MOVE DEBUG: Scale factors: X=${windowAiToLogicalScaleX.toFixed(3)}, Y=${windowAiToLogicalScaleY.toFixed(3)}`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Using AI window size: ${actualAiWindowWidth}x${actualAiWindowHeight}\n`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Scale factors: X=${windowAiToLogicalScaleX.toFixed(3)}, Y=${windowAiToLogicalScaleY.toFixed(3)}\n`);
         
         // Scale coordinates from AI window coordinates to logical window coordinates
         let scaledX = Math.round(x * windowAiToLogicalScaleX);
         let scaledY = Math.round(y * windowAiToLogicalScaleY);
         
-        console.error(`MOUSE_MOVE DEBUG: Input AI coords: (${x}, ${y})`);
-        console.error(`MOUSE_MOVE DEBUG: Scaled to logical: (${scaledX}, ${scaledY})`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Input AI coords: (${x}, ${y})\n`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Scaled to logical: (${scaledX}, ${scaledY})\n`);
         
         // Then add window position to scaled coordinates
         moveX = scaledX + targetWindow.bounds.x;
         moveY = scaledY + targetWindow.bounds.y;
         
-        console.error(`MOUSE_MOVE DEBUG: Final screen coords: (${moveX}, ${moveY})`);
-        console.error(`MOUSE_MOVE DEBUG: Window bounds check: X in [${targetWindow.bounds.x}, ${targetWindow.bounds.x + targetWindow.bounds.width}], Y in [${targetWindow.bounds.y}, ${targetWindow.bounds.y + targetWindow.bounds.height}]`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Final screen coords: (${moveX}, ${moveY})\n`);
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Window bounds check: X in [${targetWindow.bounds.x}, ${targetWindow.bounds.x + targetWindow.bounds.width}], Y in [${targetWindow.bounds.y}, ${targetWindow.bounds.y + targetWindow.bounds.height}]\n`);
       } else {
         // For regular screen coordinates, convert from AI screenshot coordinates to logical coordinates
         // using the calculated scaling factors
@@ -807,7 +810,11 @@ const capabilityImplementations = {
       const targetWidth = Math.min(Math.round(currentWidth * 0.5), 1280);
       const targetHeight = Math.min(Math.round(currentHeight * 0.5), 720);
       
-      console.error(`WINDOW_CAPTURE DEBUG: extracted window ${currentWidth}x${currentHeight}, target ${targetWidth}x${targetHeight}, will resize: ${targetWidth < currentWidth || targetHeight < currentHeight}`);
+      const fs = require('fs');
+      const timestamp = new Date().toISOString();
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `\n=== WINDOW_CAPTURE DEBUG ${timestamp} ===\n`);
+      const logMsg = `WINDOW_CAPTURE DEBUG: extracted window ${currentWidth}x${currentHeight}, target ${targetWidth}x${targetHeight}, will resize: ${targetWidth < currentWidth || targetHeight < currentHeight}\n`;
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', logMsg);
       
       // Only resize if the target is smaller than current
       if (targetWidth < currentWidth || targetHeight < currentHeight) {
@@ -818,12 +825,14 @@ const capabilityImplementations = {
           });
           
           const finalMeta = await sharpInstance.metadata();
-          console.error(`WINDOW_CAPTURE DEBUG: after resize ${finalMeta.width}x${finalMeta.height}`);
+          const logMsg2 = `WINDOW_CAPTURE DEBUG: after resize ${finalMeta.width}x${finalMeta.height}\n`;
+          fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', logMsg2);
         } catch (resizeError) {
           return { success: false, error: `Resize failed: ${resizeError.message}` };
         }
       } else {
-        console.error(`WINDOW_CAPTURE DEBUG: no resize needed`);
+        const logMsg3 = `WINDOW_CAPTURE DEBUG: no resize needed\n`;
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', logMsg3);
       }
       
       // Convert to WebP with very aggressive compression for AI analysis
