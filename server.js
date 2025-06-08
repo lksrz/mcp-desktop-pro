@@ -235,9 +235,10 @@ const capabilityImplementations = {
         fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - If AI sees expected (${assumption3_Width}): scale = ${(windowLogicalWidth / assumption3_Width).toFixed(3)}\n`);
         fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - If AI sees half logical (${assumption4_Width}): scale = ${(windowLogicalWidth / assumption4_Width).toFixed(3)}\n`);
         
-        // Use the assumption that gives us the 2.0 scale factor we observed
-        const actualAiWindowWidth = windowLogicalWidth / 2;
-        const actualAiWindowHeight = windowLogicalHeight / 2;
+        // Based on debug logs: AI sees the FULL physical window size since resize failed
+        // Window physical: 396x700, AI coordinates should be scaled down to logical: 198x350
+        const actualAiWindowWidth = windowPhysicalWidth;  // 396 for our window
+        const actualAiWindowHeight = windowPhysicalHeight; // 700 for our window
         
         const windowAiToLogicalScaleX = windowLogicalWidth / actualAiWindowWidth;
         const windowAiToLogicalScaleY = windowLogicalHeight / actualAiWindowHeight;
