@@ -207,9 +207,14 @@ const capabilityImplementations = {
         const targetWindowWidth = Math.min(Math.round(windowPhysicalWidth * 0.5), 1280);
         const targetWindowHeight = Math.min(Math.round(windowPhysicalHeight * 0.5), 720);
         
+        // The AI actually sees the unscaled window size (window_capture scaling isn't working properly)
+        // So we need to scale from the physical window size down to logical size
+        const actualAiWindowWidth = isHighDPI ? windowPhysicalWidth : windowLogicalWidth;
+        const actualAiWindowHeight = isHighDPI ? windowPhysicalHeight : windowLogicalHeight;
+        
         // Calculate the actual scaling from AI window coordinates to logical window coordinates
-        const windowAiToLogicalScaleX = windowLogicalWidth / targetWindowWidth;
-        const windowAiToLogicalScaleY = windowLogicalHeight / targetWindowHeight;
+        const windowAiToLogicalScaleX = windowLogicalWidth / actualAiWindowWidth;
+        const windowAiToLogicalScaleY = windowLogicalHeight / actualAiWindowHeight;
         
         // Scale coordinates from AI window coordinates to logical window coordinates
         let scaledX = Math.round(x * windowAiToLogicalScaleX);
@@ -296,8 +301,11 @@ const capabilityImplementations = {
               
               const targetWindowWidth = Math.min(Math.round(windowPhysicalWidth * 0.5), 1280);
               const targetWindowHeight = Math.min(Math.round(windowPhysicalHeight * 0.5), 720);
-              const windowAiToLogicalScaleX = windowLogicalWidth / targetWindowWidth;
-              const windowAiToLogicalScaleY = windowLogicalHeight / targetWindowHeight;
+              
+              const actualAiWindowWidth = isHighDPI ? windowPhysicalWidth : windowLogicalWidth;
+              const actualAiWindowHeight = isHighDPI ? windowPhysicalHeight : windowLogicalHeight;
+              const windowAiToLogicalScaleX = windowLogicalWidth / actualAiWindowWidth;
+              const windowAiToLogicalScaleY = windowLogicalHeight / actualAiWindowHeight;
               
               const step1X = Math.round(x * windowAiToLogicalScaleX);
               const step1Y = Math.round(y * windowAiToLogicalScaleY);
