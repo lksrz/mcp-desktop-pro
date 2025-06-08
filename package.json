@@ -3,7 +3,9 @@
   "version": "0.2.0",
   "description": "Advanced MCP server for desktop automation with intelligent window management, multi-action chaining, window-relative coordinates, visual debugging, and Retina display support",
   "main": "server.js",
-  "bin": "./server.js",
+  "bin": {
+    "mcp-desktop-pro": "server.js"
+  },
   "scripts": {
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -22,7 +24,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/lksrz/mcp-desktop-pro"
+    "url": "git+https://github.com/lukaszrzepecki/mcp-desktop-pro.git"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.7.0",

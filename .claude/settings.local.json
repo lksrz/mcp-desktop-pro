@@ -1,12 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(rg:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm install:*)",
+      "Bash(node server.js)",
+      "Bash(node:*)",
+      "Bash(grep:*)",
       "Bash(git add:*)",
       "Bash(git push:*)",
-      "Bash(npm:*)",
-      "Bash(grep:*)",
-      "Bash(rm:*)"
+      "Bash(npm whoami:*)",
+      "Bash(npm publish:*)",
+      "Bash(npm pkg fix:*)",
+      "Bash(git pull:*)",
+      "Bash(git rebase:*)"
     ],
     "deny": []
   }

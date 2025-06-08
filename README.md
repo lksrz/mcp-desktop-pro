@@ -2,6 +2,8 @@
 
 An advanced Model Context Protocol server for comprehensive desktop automation with **advanced window management**, visual debugging, and Retina display support. This server enables LLMs to intelligently control mouse movements, keyboard inputs, capture screenshots, **manage and target specific windows**, and perform precise automation tasks with visual feedback and window-relative coordinate systems.
 
+Ideal for testing apps, games, and running desktop tasks locally with AI agents through Model Context Protocol.
+
 ## 🚀 Main Advantages
 
 - 🪟 **Advanced Window Management**: Target specific windows with precise coordinate conversion and AppleScript integration

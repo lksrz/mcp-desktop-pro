@@ -922,33 +922,33 @@ server.tool("screen_capture", "Captures the current screen content (PRIMARY DISP
   y2: z.number().optional().describe("Bottom Y coordinate for partial capture")
 }, async (params) => capabilityImplementations.screen_capture(params));
 
-server.tool("keyboard_press", "Presses a keyboard key or key combination", {
+server.tool("keyboard_press", "Presses a keyboard key or key combination. IMPORTANT: windowId should be provided if known (after window_capture, list_windows, or when user specified a window).", {
   key: z.string().describe("Key to press (e.g., 'enter', 'a', 'control')"),
   modifiers: z.array(z.enum(["control", "shift", "alt", "command"])).default([]).describe("Modifier keys to hold while pressing the key"),
-  windowId: z.number().optional().describe("Optional window ID to focus before pressing key"),
+  windowId: z.number().optional().describe("Window ID to focus before pressing key. SHOULD be provided if known from previous operations (after window_capture, list_windows, or when user specified a window)."),
   pressLength: z.number().min(0).max(5000).default(0).describe("Optional duration to hold the key in milliseconds (0-5000ms, 0 = quick tap)")
 }, async (params) => toMcpResponse(await capabilityImplementations.keyboard_press(params)));
 
-server.tool("keyboard_type", "Types text at the current cursor position", {
+server.tool("keyboard_type", "Types text at the current cursor position. IMPORTANT: windowId should be provided if known (after window_capture, list_windows, or when user specified a window).", {
   text: z.string().describe("Text to type"),
-  windowId: z.number().optional().describe("Optional window ID to focus before typing")
+  windowId: z.number().optional().describe("Window ID to focus before typing. SHOULD be provided if known from previous operations (after window_capture, list_windows, or when user specified a window).")
 }, async (params) => toMcpResponse(await capabilityImplementations.keyboard_type(params)));
 
-server.tool("mouse_click", "Performs a mouse click, optionally moving to coordinates first", {
+server.tool("mouse_click", "Performs a mouse click, optionally moving to coordinates first. IMPORTANT: windowId should be provided if known (after window_capture, list_windows, or in continuation).", {
   button: z.enum(["left", "right", "middle"]).default("left").describe("Mouse button to click"),
   double: z.boolean().default(false).describe("Whether to perform a double click"),
-  windowId: z.number().optional().describe("Optional window ID to focus before clicking"),
+  windowId: z.number().optional().describe("Window ID to focus before clicking. SHOULD be provided if known from previous operations (after window_capture, list_windows, or when user specified a window)."),
   pressLength: z.number().min(0).max(5000).default(0).describe("Optional duration to hold the mouse button in milliseconds (0-5000ms, 0 = quick click)"),
   x: z.number().optional().describe("X coordinate to move to before clicking"),
   y: z.number().optional().describe("Y coordinate to move to before clicking"),
-  windowInsideCoordinates: z.boolean().default(false).describe("If true, x/y coordinates are relative to window (requires windowId)")
+  windowInsideCoordinates: z.boolean().default(false).describe("If true, x/y coordinates are relative to window (requires windowId). REQUIRED when coordinates come from window_capture.")
 }, async (params) => toMcpResponse(await capabilityImplementations.mouse_click(params)));
 
-server.tool("mouse_move", "Moves the mouse to specified coordinates. Automatically handles Retina scaling.", {
+server.tool("mouse_move", "Moves the mouse to specified coordinates. Automatically handles Retina scaling. IMPORTANT: windowInsideCoordinates is OBLIGATORY when coordinates come from window_capture analysis (not for screen_capture).", {
   x: z.number().describe("X coordinate"),
   y: z.number().describe("Y coordinate"),
   debug: z.boolean().default(false).describe("If true, takes a screenshot with a red circle showing where the cursor moved for verification"),
-  windowInsideCoordinates: z.boolean().default(false).describe("If true, coordinates are relative to a window and will be converted to absolute screen coordinates (requires windowId)"),
+  windowInsideCoordinates: z.boolean().default(false).describe("If true, coordinates are relative to a window and will be converted to absolute screen coordinates (requires windowId). REQUIRED when using coordinates from window_capture."),
   windowId: z.number().optional().describe("Window ID required when using windowInsideCoordinates")
 }, async (params) => {
   const result = await capabilityImplementations.mouse_move(params);
@@ -959,7 +959,7 @@ server.tool("mouse_move", "Moves the mouse to specified coordinates. Automatical
   }
 });
 
-server.tool("list_windows", "Lists all open windows with their properties, including multi-display detection and accessibility flags", {},
+server.tool("list_windows", "Lists all open windows with their properties. IMPORTANT: This is the preferred first tool to use and is obligatory when user asks about any window operations.", {},
   async () => toMcpResponse(await capabilityImplementations.list_windows()));
 
 server.tool("focus_window", "Focuses on a specific window to bring it to the front", {
