@@ -777,8 +777,8 @@ const capabilityImplementations = {
       if (targetWidth < currentWidth || targetHeight < currentHeight) {
         try {
           sharpInstance = sharpInstance.resize(targetWidth, targetHeight, {
-            fit: 'inside',
-            withoutEnlargement: true
+            fit: 'fill',
+            kernel: sharp.kernel.lanczos3
           });
           
           // Verify the resize worked
