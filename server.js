@@ -191,7 +191,6 @@ const capabilityImplementations = {
         const windowLogicalWidth = targetWindow.bounds.width;
         const windowLogicalHeight = targetWindow.bounds.height;
         
-        const fs = require('fs');
         const timestamp = new Date().toISOString();
         fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `\n=== MOUSE_MOVE DEBUG ${timestamp} ===\n`);
         fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Window logical size: ${windowLogicalWidth}x${windowLogicalHeight}\n`);
@@ -642,6 +641,7 @@ const capabilityImplementations = {
 
   window_capture: async (params) => {
     try {
+      const fs = require('fs');
       const activeWin = require('active-win');
       const { exec } = require('child_process');
       const { promisify } = require('util');
@@ -814,7 +814,6 @@ const capabilityImplementations = {
       const targetWidth = Math.min(Math.round(currentWidth * 0.5), 1280);
       const targetHeight = Math.min(Math.round(currentHeight * 0.5), 720);
       
-      const fs = require('fs');
       const timestamp = new Date().toISOString();
       fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `\n=== WINDOW_CAPTURE DEBUG ${timestamp} ===\n`);
       const logMsg = `WINDOW_CAPTURE DEBUG: extracted window ${currentWidth}x${currentHeight}, target ${targetWidth}x${targetHeight}, will resize: ${targetWidth < currentWidth || targetHeight < currentHeight}\n`;
@@ -1093,7 +1092,6 @@ server.resource(
       ]
     };
 
-    server.server.sendLoggingMessage({level: "info", data: `Returned ${JSON.stringify(result)}`});
     return result;
   }
 );
