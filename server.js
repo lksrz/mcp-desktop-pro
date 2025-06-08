@@ -642,10 +642,6 @@ const capabilityImplementations = {
 
   window_capture: async (params) => {
     try {
-      // Test logging at the very start
-      const fs = require('fs');
-      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', 'WINDOW_CAPTURE: Function started\n');
-      
       const activeWin = require('active-win');
       const { exec } = require('child_process');
       const { promisify } = require('util');
