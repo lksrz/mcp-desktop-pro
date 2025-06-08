@@ -141,23 +141,27 @@ const capabilityImplementations = {
       let moveX = x;
       let moveY = y;
       
-      // Always check for Retina scaling first
-      // Take a quick screenshot to determine scaling
+      // Calculate the actual screenshot scaling ratio by simulating screen_capture logic
+      const screenSize = robot.getScreenSize();
       const tempScreenshot = await screenshot({ format: 'jpg' });
       const sharp = require('sharp');
       const metadata = await sharp(tempScreenshot).metadata();
-      const screenSize = robot.getScreenSize();
       
-      const scaleX = metadata.width / screenSize.width;
-      const scaleY = metadata.height / screenSize.height;
-      const isRetina = scaleX > 1.5 || scaleY > 1.5;
+      // Calculate what the AI screenshot size would be using screen_capture logic
+      const currentWidth = metadata.width;
+      const currentHeight = metadata.height;
       
-      // Account for our 50% screenshot scaling
-      // When AI analyzes screenshots, they see 50% scaled images
-      // So coordinates from AI need to be doubled to match the original screenshot resolution
-      // But on Retina displays, the original screenshot is already 2x logical resolution
-      // So we need to account for both scaling factors properly
-      const screenshotScaleFactor = 2.0; // We always scale screenshots to 50%
+      // This matches the screen_capture scaling logic: 50% but capped at 1280x720
+      const targetWidth = Math.min(Math.round(currentWidth * 0.5), 1280);
+      const targetHeight = Math.min(Math.round(currentHeight * 0.5), 720);
+      
+      // Calculate the actual scaling factor from logical screen size to AI screenshot size
+      const screenToScreenshotScaleX = targetWidth / screenSize.width;
+      const screenToScreenshotScaleY = targetHeight / screenSize.height;
+      
+      // The factor to convert from AI coordinates back to logical screen coordinates
+      const aiToLogicalScaleX = screenSize.width / targetWidth;
+      const aiToLogicalScaleY = screenSize.height / targetHeight;
       
       // If coordinates are relative to a window (windowInsideCoordinates=true),
       // first scale the relative coordinates, then add window position
@@ -179,30 +183,18 @@ const capabilityImplementations = {
           return { success: false, error: `Window not found for coordinate conversion with ID: ${windowId}` };
         }
         
-        // Scale coordinates for screenshot scaling (AI sees 50% scaled images)
-        // Multiply by 2 to convert from AI coordinates to logical coordinates
-        let scaledX = Math.round(x * screenshotScaleFactor);
-        let scaledY = Math.round(y * screenshotScaleFactor);
-        
-        // No additional Retina scaling needed - robot.moveMouse expects logical coordinates
-        // and window bounds are already in logical coordinate space
+        // Scale coordinates from AI screenshot coordinates to logical coordinates
+        let scaledX = Math.round(x * aiToLogicalScaleX);
+        let scaledY = Math.round(y * aiToLogicalScaleY);
         
         // Then add window position to scaled coordinates
         moveX = scaledX + targetWindow.bounds.x;
         moveY = scaledY + targetWindow.bounds.y;
       } else {
-        // For regular screen coordinates, apply screenshot scaling to get back to logical coordinates
-        // AI coordinates are from 50% scaled screenshots, so multiply by 2 to get logical coordinates
-        // robot.moveMouse expects logical coordinates, not physical pixel coordinates
-        moveX = Math.round(moveX * screenshotScaleFactor);
-        moveY = Math.round(moveY * screenshotScaleFactor);
-        
-        // No additional Retina scaling needed because:
-        // 1. Screenshot is captured at physical resolution (e.g., 2880x1800)
-        // 2. Scaled to 50% for AI (e.g., 1440x900) 
-        // 3. AI gives coordinates relative to scaled image (e.g., x=1135 in 1440x900 image)
-        // 4. Multiply by 2 to get logical coordinates (e.g., x=2270 in 1440x900 logical space)
-        // 5. robot.moveMouse() handles the conversion to physical coordinates internally
+        // For regular screen coordinates, convert from AI screenshot coordinates to logical coordinates
+        // using the calculated scaling factors
+        moveX = Math.round(moveX * aiToLogicalScaleX);
+        moveY = Math.round(moveY * aiToLogicalScaleY);
       }
       
       robot.moveMouse(moveX, moveY);
@@ -258,26 +250,16 @@ const capabilityImplementations = {
             const windows = await require('active-win').getOpenWindows();
             const targetWindow = windows.find(w => w.id === windowId);
             if (targetWindow) {
-              const step1X = Math.round(x * screenshotScaleFactor);
-              const step1Y = Math.round(y * screenshotScaleFactor);
-              transformations.push(`window-relative (${x}, ${y}) -> screenshot scaled (${step1X}, ${step1Y})`);
-              
-              if (isRetina) {
-                const step2X = Math.round(step1X / scaleX);
-                const step2Y = Math.round(step1Y / scaleY);
-                transformations.push(`retina scaled (${step2X}, ${step2Y}) -> screen (${step2X + targetWindow.bounds.x}, ${step2Y + targetWindow.bounds.y})`);
-              } else {
-                transformations.push(`screen (${step1X + targetWindow.bounds.x}, ${step1Y + targetWindow.bounds.y})`);
-              }
+              const step1X = Math.round(x * aiToLogicalScaleX);
+              const step1Y = Math.round(y * aiToLogicalScaleY);
+              transformations.push(`window-relative (${x}, ${y}) -> logical scaled (${step1X}, ${step1Y})`);
+              transformations.push(`screen (${step1X + targetWindow.bounds.x}, ${step1Y + targetWindow.bounds.y})`);
             }
           } else {
-            const step1X = Math.round(x * screenshotScaleFactor);
-            const step1Y = Math.round(y * screenshotScaleFactor);
-            transformations.push(`screenshot scaled (${x}, ${y}) -> (${step1X}, ${step1Y})`);
-            
-            if (isRetina) {
-              transformations.push(`retina scaling applied`);
-            }
+            const step1X = Math.round(x * aiToLogicalScaleX);
+            const step1Y = Math.round(y * aiToLogicalScaleY);
+            transformations.push(`AI coords (${x}, ${y}) -> logical coords (${step1X}, ${step1Y})`);
+            transformations.push(`scale factors: X=${aiToLogicalScaleX.toFixed(3)}, Y=${aiToLogicalScaleY.toFixed(3)}`);
           }
           
           return {
