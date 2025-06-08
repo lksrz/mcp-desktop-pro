@@ -770,6 +770,9 @@ const capabilityImplementations = {
       const targetWidth = Math.min(Math.round(currentWidth * 0.5), 1280);
       const targetHeight = Math.min(Math.round(currentHeight * 0.5), 720);
       
+      // Debug: Log the scaling calculation
+      console.error(`Window capture scaling debug: current=${currentWidth}x${currentHeight}, target=${targetWidth}x${targetHeight}, willResize=${targetWidth < currentWidth || targetHeight < currentHeight}`);
+      
       // Only resize if the target is smaller than current
       if (targetWidth < currentWidth || targetHeight < currentHeight) {
         try {
@@ -777,9 +780,15 @@ const capabilityImplementations = {
             fit: 'inside',
             withoutEnlargement: true
           });
+          
+          // Verify the resize worked
+          const resizedMeta = await sharpInstance.metadata();
+          console.error(`Window capture after resize: ${resizedMeta.width}x${resizedMeta.height}`);
         } catch (resizeError) {
           return { success: false, error: `Resize failed: ${resizeError.message}` };
         }
+      } else {
+        console.error(`Window capture: No resize needed`);
       }
       
       // Convert to WebP with very aggressive compression for AI analysis
