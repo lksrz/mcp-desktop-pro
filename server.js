@@ -183,19 +183,24 @@ const capabilityImplementations = {
           return { success: false, error: `Window not found for coordinate conversion with ID: ${windowId}` };
         }
         
-        // For window coordinates, we need to calculate window-specific scaling
-        // The AI sees the window screenshot which should be scaled, but we need to account
-        // for the actual scaling that happened in window_capture
+        // COMPLETE COORDINATE DEBUG - Let's trace every step
         const windowLogicalWidth = targetWindow.bounds.width;
         const windowLogicalHeight = targetWindow.bounds.height;
         
-        // Calculate what the window screenshot size should be after window_capture processing
+        console.error(`MOUSE_MOVE DEBUG: Window logical size: ${windowLogicalWidth}x${windowLogicalHeight}`);
+        console.error(`MOUSE_MOVE DEBUG: Window position: (${targetWindow.bounds.x}, ${targetWindow.bounds.y})`);
+        console.error(`MOUSE_MOVE DEBUG: Screen size: ${screenSize.width}x${screenSize.height}`);
+        console.error(`MOUSE_MOVE DEBUG: Screenshot metadata: ${metadata.width}x${metadata.height}`);
+        
+        // Calculate retina scaling
         const isHighDPI = (metadata.width / screenSize.width) > 1.5 || (metadata.height / screenSize.height) > 1.5;
+        const scaleX = metadata.width / screenSize.width;
+        const scaleY = metadata.height / screenSize.height;
+        
+        console.error(`MOUSE_MOVE DEBUG: Retina detection: isHighDPI=${isHighDPI}, scaleX=${scaleX.toFixed(3)}, scaleY=${scaleY.toFixed(3)}`);
         
         let windowPhysicalWidth, windowPhysicalHeight;
         if (isHighDPI) {
-          const scaleX = metadata.width / screenSize.width;
-          const scaleY = metadata.height / screenSize.height;
           windowPhysicalWidth = windowLogicalWidth * scaleX;
           windowPhysicalHeight = windowLogicalHeight * scaleY;
         } else {
@@ -203,26 +208,50 @@ const capabilityImplementations = {
           windowPhysicalHeight = windowLogicalHeight;
         }
         
-        // Apply the same 50% scaling logic as window_capture
+        console.error(`MOUSE_MOVE DEBUG: Window physical size: ${windowPhysicalWidth}x${windowPhysicalHeight}`);
+        
+        // What window_capture should produce
         const targetWindowWidth = Math.min(Math.round(windowPhysicalWidth * 0.5), 1280);
         const targetWindowHeight = Math.min(Math.round(windowPhysicalHeight * 0.5), 720);
         
-        // The AI is seeing an even smaller image than expected (scale factor 2.0 from debug)
-        // This suggests window_capture is scaling more aggressively than calculated
-        const actualAiWindowWidth = windowLogicalWidth / 2;  // Half the logical size
+        console.error(`MOUSE_MOVE DEBUG: Expected AI window size: ${targetWindowWidth}x${targetWindowHeight}`);
+        
+        // But based on previous debug output, AI sees something different
+        // Let's try different assumptions and see which matches the 2.0 scale factor
+        const assumption1_Width = windowLogicalWidth; // AI sees logical size
+        const assumption2_Width = windowPhysicalWidth; // AI sees physical size  
+        const assumption3_Width = targetWindowWidth; // AI sees expected scaled size
+        const assumption4_Width = windowLogicalWidth / 2; // AI sees half logical
+        
+        console.error(`MOUSE_MOVE DEBUG: Testing scale factor assumptions:`);
+        console.error(`  - If AI sees logical (${assumption1_Width}): scale = ${(windowLogicalWidth / assumption1_Width).toFixed(3)}`);
+        console.error(`  - If AI sees physical (${assumption2_Width}): scale = ${(windowLogicalWidth / assumption2_Width).toFixed(3)}`);
+        console.error(`  - If AI sees expected (${assumption3_Width}): scale = ${(windowLogicalWidth / assumption3_Width).toFixed(3)}`);
+        console.error(`  - If AI sees half logical (${assumption4_Width}): scale = ${(windowLogicalWidth / assumption4_Width).toFixed(3)}`);
+        
+        // Use the assumption that gives us the 2.0 scale factor we observed
+        const actualAiWindowWidth = windowLogicalWidth / 2;
         const actualAiWindowHeight = windowLogicalHeight / 2;
         
-        // Calculate the actual scaling from AI window coordinates to logical window coordinates
         const windowAiToLogicalScaleX = windowLogicalWidth / actualAiWindowWidth;
         const windowAiToLogicalScaleY = windowLogicalHeight / actualAiWindowHeight;
+        
+        console.error(`MOUSE_MOVE DEBUG: Using AI window size: ${actualAiWindowWidth}x${actualAiWindowHeight}`);
+        console.error(`MOUSE_MOVE DEBUG: Scale factors: X=${windowAiToLogicalScaleX.toFixed(3)}, Y=${windowAiToLogicalScaleY.toFixed(3)}`);
         
         // Scale coordinates from AI window coordinates to logical window coordinates
         let scaledX = Math.round(x * windowAiToLogicalScaleX);
         let scaledY = Math.round(y * windowAiToLogicalScaleY);
         
+        console.error(`MOUSE_MOVE DEBUG: Input AI coords: (${x}, ${y})`);
+        console.error(`MOUSE_MOVE DEBUG: Scaled to logical: (${scaledX}, ${scaledY})`);
+        
         // Then add window position to scaled coordinates
         moveX = scaledX + targetWindow.bounds.x;
         moveY = scaledY + targetWindow.bounds.y;
+        
+        console.error(`MOUSE_MOVE DEBUG: Final screen coords: (${moveX}, ${moveY})`);
+        console.error(`MOUSE_MOVE DEBUG: Window bounds check: X in [${targetWindow.bounds.x}, ${targetWindow.bounds.x + targetWindow.bounds.width}], Y in [${targetWindow.bounds.y}, ${targetWindow.bounds.y + targetWindow.bounds.height}]`);
       } else {
         // For regular screen coordinates, convert from AI screenshot coordinates to logical coordinates
         // using the calculated scaling factors
@@ -778,6 +807,8 @@ const capabilityImplementations = {
       const targetWidth = Math.min(Math.round(currentWidth * 0.5), 1280);
       const targetHeight = Math.min(Math.round(currentHeight * 0.5), 720);
       
+      console.error(`WINDOW_CAPTURE DEBUG: extracted window ${currentWidth}x${currentHeight}, target ${targetWidth}x${targetHeight}, will resize: ${targetWidth < currentWidth || targetHeight < currentHeight}`);
+      
       // Only resize if the target is smaller than current
       if (targetWidth < currentWidth || targetHeight < currentHeight) {
         try {
@@ -785,9 +816,14 @@ const capabilityImplementations = {
             fit: 'fill',
             kernel: sharp.kernel.lanczos3
           });
+          
+          const finalMeta = await sharpInstance.metadata();
+          console.error(`WINDOW_CAPTURE DEBUG: after resize ${finalMeta.width}x${finalMeta.height}`);
         } catch (resizeError) {
           return { success: false, error: `Resize failed: ${resizeError.message}` };
         }
+      } else {
+        console.error(`WINDOW_CAPTURE DEBUG: no resize needed`);
       }
       
       // Convert to WebP with very aggressive compression for AI analysis
