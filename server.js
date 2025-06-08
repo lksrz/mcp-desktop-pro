@@ -980,7 +980,7 @@ server.resource(
       contents: [
         ...Object.keys(screenshots).map(name => ({
           uri: `screenshot://${name}`,
-          mimeType: "image/jpeg",
+          mimeType: "image/webp",
           blob: screenshots[name],
         })),
       ]
@@ -997,7 +997,7 @@ server.resource(
   async (uri, { id }) => ({
     contents: [{
       uri: uri.href,
-      mimeType: "image/jpeg",
+      mimeType: "image/webp",
       blob: screenshots[id],
     }]
   })
