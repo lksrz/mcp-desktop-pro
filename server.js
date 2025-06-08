@@ -756,8 +756,8 @@ const capabilityImplementations = {
           },
           {
             type: "image",
-            data: `data:image/webp;base64,${base64}`,
-            mimeType: "image/webp"
+            mimeType: "image/webp",
+            data: base64,
           }
         ],
         isError: false
