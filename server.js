@@ -183,9 +183,37 @@ const capabilityImplementations = {
           return { success: false, error: `Window not found for coordinate conversion with ID: ${windowId}` };
         }
         
-        // Scale coordinates from AI screenshot coordinates to logical coordinates
-        let scaledX = Math.round(x * aiToLogicalScaleX);
-        let scaledY = Math.round(y * aiToLogicalScaleY);
+        // For window coordinates, we need to calculate window-specific scaling
+        // The AI sees the window screenshot which should be scaled, but we need to account
+        // for the actual scaling that happened in window_capture
+        const windowLogicalWidth = targetWindow.bounds.width;
+        const windowLogicalHeight = targetWindow.bounds.height;
+        
+        // Calculate what the window screenshot size should be after window_capture processing
+        const isHighDPI = (metadata.width / screenSize.width) > 1.5 || (metadata.height / screenSize.height) > 1.5;
+        
+        let windowPhysicalWidth, windowPhysicalHeight;
+        if (isHighDPI) {
+          const scaleX = metadata.width / screenSize.width;
+          const scaleY = metadata.height / screenSize.height;
+          windowPhysicalWidth = windowLogicalWidth * scaleX;
+          windowPhysicalHeight = windowLogicalHeight * scaleY;
+        } else {
+          windowPhysicalWidth = windowLogicalWidth;
+          windowPhysicalHeight = windowLogicalHeight;
+        }
+        
+        // Apply the same 50% scaling logic as window_capture
+        const targetWindowWidth = Math.min(Math.round(windowPhysicalWidth * 0.5), 1280);
+        const targetWindowHeight = Math.min(Math.round(windowPhysicalHeight * 0.5), 720);
+        
+        // Calculate the actual scaling from AI window coordinates to logical window coordinates
+        const windowAiToLogicalScaleX = windowLogicalWidth / targetWindowWidth;
+        const windowAiToLogicalScaleY = windowLogicalHeight / targetWindowHeight;
+        
+        // Scale coordinates from AI window coordinates to logical window coordinates
+        let scaledX = Math.round(x * windowAiToLogicalScaleX);
+        let scaledY = Math.round(y * windowAiToLogicalScaleY);
         
         // Then add window position to scaled coordinates
         moveX = scaledX + targetWindow.bounds.x;
@@ -250,10 +278,32 @@ const capabilityImplementations = {
             const windows = await require('active-win').getOpenWindows();
             const targetWindow = windows.find(w => w.id === windowId);
             if (targetWindow) {
-              const step1X = Math.round(x * aiToLogicalScaleX);
-              const step1Y = Math.round(y * aiToLogicalScaleY);
-              transformations.push(`window-relative (${x}, ${y}) -> logical scaled (${step1X}, ${step1Y})`);
-              transformations.push(`screen (${step1X + targetWindow.bounds.x}, ${step1Y + targetWindow.bounds.y})`);
+              // Recalculate window-specific scaling for debug output
+              const windowLogicalWidth = targetWindow.bounds.width;
+              const windowLogicalHeight = targetWindow.bounds.height;
+              const isHighDPI = (metadata.width / screenSize.width) > 1.5 || (metadata.height / screenSize.height) > 1.5;
+              
+              let windowPhysicalWidth, windowPhysicalHeight;
+              if (isHighDPI) {
+                const scaleX = metadata.width / screenSize.width;
+                const scaleY = metadata.height / screenSize.height;
+                windowPhysicalWidth = windowLogicalWidth * scaleX;
+                windowPhysicalHeight = windowLogicalHeight * scaleY;
+              } else {
+                windowPhysicalWidth = windowLogicalWidth;
+                windowPhysicalHeight = windowLogicalHeight;
+              }
+              
+              const targetWindowWidth = Math.min(Math.round(windowPhysicalWidth * 0.5), 1280);
+              const targetWindowHeight = Math.min(Math.round(windowPhysicalHeight * 0.5), 720);
+              const windowAiToLogicalScaleX = windowLogicalWidth / targetWindowWidth;
+              const windowAiToLogicalScaleY = windowLogicalHeight / targetWindowHeight;
+              
+              const step1X = Math.round(x * windowAiToLogicalScaleX);
+              const step1Y = Math.round(y * windowAiToLogicalScaleY);
+              transformations.push(`window AI coords (${x}, ${y}) -> window logical (${step1X}, ${step1Y})`);
+              transformations.push(`window scale factors: X=${windowAiToLogicalScaleX.toFixed(3)}, Y=${windowAiToLogicalScaleY.toFixed(3)}`);
+              transformations.push(`final screen coords (${step1X + targetWindow.bounds.x}, ${step1Y + targetWindow.bounds.y})`);
             }
           } else {
             const step1X = Math.round(x * aiToLogicalScaleX);
