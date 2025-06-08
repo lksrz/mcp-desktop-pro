@@ -166,6 +166,10 @@ const capabilityImplementations = {
       // If coordinates are relative to a window (windowInsideCoordinates=true),
       // first scale the relative coordinates, then add window position
       if (windowInsideCoordinates) {
+        // Test logging at the very start of mouse_move
+        const fs = require('fs');
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', 'MOUSE_MOVE: windowInsideCoordinates branch started\n');
+        
         if (!windowId) {
           return { success: false, error: 'windowId is required when using windowInsideCoordinates' };
         }
@@ -638,6 +642,10 @@ const capabilityImplementations = {
 
   window_capture: async (params) => {
     try {
+      // Test logging at the very start
+      const fs = require('fs');
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', 'WINDOW_CAPTURE: Function started\n');
+      
       const activeWin = require('active-win');
       const { exec } = require('child_process');
       const { promisify } = require('util');
