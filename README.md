@@ -107,24 +107,22 @@ When first running this MCP server, you may need to grant these permissions in y
 #### Mouse Control
 
 - **mouse_move**
-  - Moves the mouse to specified coordinates with automatic Retina scaling
+  - Moves the mouse to specified coordinates with automatic Retina scaling. When targeting buttons (especially in grids like calculators), aim for the center of the button rather than edges to ensure reliable clicks.
   - Inputs:
-    - `x`, `y` (numbers, required): Target coordinates
+    - `x`, `y` (numbers, required): Target coordinates relative to the specified window (aim for button centers, not edges)
+    - `windowId` (number, required): Window ID for coordinate conversion. All mouse movements must be relative to a window.
     - `debug` (boolean, optional): Show red circle at cursor position for verification
-    - `windowInsideCoordinates` (boolean, optional): Treat coordinates as relative to window
-    - `windowId` (number, optional): Window ID for coordinate conversion
   - Features: Automatic scaling, visual debugging, window-relative positioning
 
 - **mouse_click**
-  - Performs a mouse click with optional move-to-coordinates and duration control
+  - Performs a mouse click, optionally moving to coordinates first. When clicking buttons (especially in grids like calculators), aim for the center of the button rather than edges to ensure reliable clicks.
   - Inputs:
     - `button` (string, optional, default: "left"): "left", "right", "middle"
-    - `double` (boolean, optional): Whether to perform a double click
-    - `windowId` (number, optional): Focus window before clicking
+    - `double` (boolean, optional): Whether to perform a double click (works correctly with native robotjs)
+    - `windowId` (number, required): Focus window before clicking. This is a required parameter.
     - `pressLength` (number, optional, 0-5000ms): Duration to hold mouse button
-    - `x`, `y` (numbers, optional): Coordinates to move to before clicking
-    - `windowInsideCoordinates` (boolean, optional): Treat x/y as relative to window
-  - Features: Move and click in one action, or click at current position
+    - `x`, `y` (numbers, optional): Coordinates (relative to the window) to move to before clicking (aim for button centers, not edges)
+  - Features: Move and click in one action, or click at current position within a focused window.
 
 #### Keyboard Control
 
@@ -231,7 +229,6 @@ window_capture({ windowId: 12345 })
 // 3. Option A: Move then click (two steps)
 mouse_move({ 
   x: 150, y: 200, 
-  windowInsideCoordinates: true, 
   windowId: 12345,
   debug: true  // Show red circle for verification
 })
@@ -240,7 +237,6 @@ mouse_click({ windowId: 12345 })
 // 3. Option B: Move and click in one action
 mouse_click({
   x: 150, y: 200,
-  windowInsideCoordinates: true,
   windowId: 12345
 })
 ```
@@ -261,25 +257,23 @@ mouse_click()
 ### Move and Click in One Action
 ```javascript
 // Traditional approach (two separate calls)
-mouse_move({ x: 150, y: 200, windowInsideCoordinates: true, windowId: 12345 })
+mouse_move({ x: 150, y: 200, windowId: 12345 })
 mouse_click({ windowId: 12345 })
 
 // New approach (single call with coordinates)
 mouse_click({
   x: 150, y: 200,
-  windowInsideCoordinates: true,
   windowId: 12345,
   button: "left",
   pressLength: 500  // Hold for 500ms
 })
 
-// Works with all coordinate systems
-mouse_click({ x: 400, y: 300 })  // Absolute screen coordinates
-mouse_click({ 
-  x: 100, y: 150, 
-  windowInsideCoordinates: true, 
-  windowId: 12345 
-})  // Window-relative coordinates
+// Double-click support
+mouse_click({
+  x: 150, y: 200,
+  windowId: 12345,
+  double: true  // Performs a double-click
+})
 ```
 
 ### Gaming and Duration Control
@@ -336,7 +330,6 @@ multiple_desktop_actions({
       type: "mouse_click",
       params: { 
         x: 150, y: 200, 
-        windowInsideCoordinates: true, 
         windowId: 12345
       },
       delay: 500
@@ -400,18 +393,23 @@ multiple_desktop_actions({
 
 ### Screenshot Scaling and Coordinate Handling
 The server automatically handles multiple scaling factors:
-- **Screenshots**: Always scaled to 50% for AI optimization
+- **Screenshots**: Always scaled to 50% for AI optimization with aspect ratio preservation
 - **Retina displays**: Automatic detection and coordinate conversion
 - **Mouse coordinates**: Automatically scaled up 2x to account for 50% screenshot scaling
-- **Window coordinates**: Properly scaled for accurate positioning
+- **Window coordinates**: Properly scaled for accurate positioning without title bar offsets
 
 ### Window-Relative Coordinates
-When using `windowInsideCoordinates: true`:
-1. Coordinates are relative to the window's top-left corner (0,0)
-2. **Screenshot scaling applied**: Coordinates × 2 (from 50% scaled screenshot)
-3. **Retina scaling applied**: If needed, coordinates ÷ retina factor
-4. **Window offset added**: Final coordinates = scaled coords + window position
-5. Perfect for clicking elements within specific windows
+All mouse operations use window-relative coordinates:
+1. Coordinates are relative to the window's content area (0,0)
+2. **Automatic scaling**: Handles different window sizes and display densities
+3. **Precise positioning**: No manual offset calculations needed
+4. **Required windowId**: Ensures accurate coordinate transformation
+
+### Recent Fixes and Improvements
+- **Aspect ratio preservation**: Window captures now use `fit: 'inside'` to maintain proper aspect ratios
+- **Title bar offset removed**: Fixed Y-axis positioning errors by removing incorrect MACOS_TITLE_BAR_HEIGHT
+- **Double-click fixed**: Native robotjs double-click now works correctly with proper syntax
+- **Button center targeting**: Tool descriptions updated to guide users to click button centers for reliability
 
 ## System Requirements
 
@@ -524,6 +522,7 @@ This error occurs when Claude Desktop uses a different Node.js version than the 
 - Use `windowInsideCoordinates` for window-relative positioning
 - For `mouse_click` with coordinates: same coordinate logic as `mouse_move` applies
 - Screenshot coordinates are automatically scaled 2x to account for 50% image scaling
+- When clicking buttons, aim for the center rather than edges for reliable clicks
 
 ### Window Focus Problems
 - Use `windowId` from `list_windows` for accurate targeting

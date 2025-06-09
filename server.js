@@ -6,6 +6,7 @@ const robot = require('robotjs');
 const { McpServer, ResourceTemplate } = require("@modelcontextprotocol/sdk/server/mcp.js");
 const { StdioServerTransport } = require("@modelcontextprotocol/sdk/server/stdio.js");
 const { z } = require("zod");
+const fs = require('fs');
 
 const packageJson = require('./package.json');
 
@@ -113,12 +114,36 @@ const capabilityImplementations = {
 
       screenshots[screenshotKey] = imgInBase64;
       await server.server.sendResourceListChanged();
-
+      
+      // Calculate actual AI image dimensions
+      const finalMeta = await sharp(img).metadata();
+      const aiImageWidth = finalMeta.width;
+      const aiImageHeight = finalMeta.height;
+      
+      // Store screen capture metadata for coordinate transformations
+      // We will assume the AI sees the image at the size we report.
+      const aiActualWidth = aiImageWidth;
+      const aiActualHeight = aiImageHeight;
+      
+      const screenCaptureMetadata = {
+        originalSize: { width: metadata.width, height: metadata.height },
+        logicalScreenSize: { width: screenSize.width, height: screenSize.height },
+        reportedAiSize: { width: aiImageWidth, height: aiImageHeight },
+        aiImageSize: { width: aiActualWidth, height: aiActualHeight }, // What AI actually sees
+        timestamp: Date.now()
+      };
+      
+      // Store in global for mouse_move to access
+      if (!global.screenCaptureMetadata) {
+        global.screenCaptureMetadata = {};
+      }
+      global.lastScreenCapture = screenCaptureMetadata;
+      
       return {
         content: [
           {
             type: "text",
-            text: `Screenshot ${screenshotKey} taken (optimized for AI analysis).`,
+            text: `Screenshot ${screenshotKey} taken. Screen size: ${screenSize.width}x${screenSize.height}, AI sees: ${aiImageWidth}x${aiImageHeight}`,
           },
           {
             type: "image",
@@ -136,139 +161,161 @@ const capabilityImplementations = {
 
   mouse_move: async (params) => {
     try {
-      const { x, y, debug = false, windowInsideCoordinates = false, windowId } = params;
+      // Add a timestamped log to mark the beginning of the function call
+      const timestamp = new Date().toISOString();
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `\n--- MOUSE_MOVE START ${timestamp} ---\n`);
+
+      const { x, y, debug = false, windowId } = params;
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `Params: ${JSON.stringify(params)}\n`);
+      
+      // Store original coordinates for debug visualization
+      const originalX = x;
+      const originalY = y;
       
       let moveX = x;
       let moveY = y;
       
-      // Calculate the actual screenshot scaling ratio by simulating screen_capture logic
-      const screenSize = robot.getScreenSize();
-      const tempScreenshot = await screenshot({ format: 'jpg' });
-      const sharp = require('sharp');
-      const metadata = await sharp(tempScreenshot).metadata();
-      
-      // Calculate what the AI screenshot size would be using screen_capture logic
-      const currentWidth = metadata.width;
-      const currentHeight = metadata.height;
-      
-      // This matches the screen_capture scaling logic: 50% but capped at 1280x720
-      const targetWidth = Math.min(Math.round(currentWidth * 0.5), 1280);
-      const targetHeight = Math.min(Math.round(currentHeight * 0.5), 720);
-      
-      // Calculate the actual scaling factor from logical screen size to AI screenshot size
-      const screenToScreenshotScaleX = targetWidth / screenSize.width;
-      const screenToScreenshotScaleY = targetHeight / screenSize.height;
-      
-      // The factor to convert from AI coordinates back to logical screen coordinates
-      const aiToLogicalScaleX = screenSize.width / targetWidth;
-      const aiToLogicalScaleY = screenSize.height / targetHeight;
-      
-      // If coordinates are relative to a window (windowInsideCoordinates=true),
-      // first scale the relative coordinates, then add window position
-      if (windowInsideCoordinates) {
-        // Test logging at the very start of mouse_move
-        const fs = require('fs');
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', 'MOUSE_MOVE: windowInsideCoordinates branch started\n');
-        
-        if (!windowId) {
-          return { success: false, error: 'windowId is required when using windowInsideCoordinates' };
-        }
-        
-        const activeWin = require('active-win');
-        const windows = await activeWin.getOpenWindows();
-        
-        if (!windows || !Array.isArray(windows)) {
-          return { success: false, error: 'Failed to get window list for coordinate conversion' };
-        }
-        
-        const targetWindow = windows.find(w => w && w.id === windowId);
-        
-        if (!targetWindow) {
-          return { success: false, error: `Window not found for coordinate conversion with ID: ${windowId}` };
-        }
-        
-        // COMPLETE COORDINATE DEBUG - Let's trace every step
-        const windowLogicalWidth = targetWindow.bounds.width;
-        const windowLogicalHeight = targetWindow.bounds.height;
-        
-        const timestamp = new Date().toISOString();
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `\n=== MOUSE_MOVE DEBUG ${timestamp} ===\n`);
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Window logical size: ${windowLogicalWidth}x${windowLogicalHeight}\n`);
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Window position: (${targetWindow.bounds.x}, ${targetWindow.bounds.y})\n`);
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Screen size: ${screenSize.width}x${screenSize.height}\n`);
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Screenshot metadata: ${metadata.width}x${metadata.height}\n`);
-        
-        // Calculate retina scaling
-        const isHighDPI = (metadata.width / screenSize.width) > 1.5 || (metadata.height / screenSize.height) > 1.5;
-        const scaleX = metadata.width / screenSize.width;
-        const scaleY = metadata.height / screenSize.height;
-        
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Retina detection: isHighDPI=${isHighDPI}, scaleX=${scaleX.toFixed(3)}, scaleY=${scaleY.toFixed(3)}\n`);
-        
-        let windowPhysicalWidth, windowPhysicalHeight;
-        if (isHighDPI) {
-          windowPhysicalWidth = windowLogicalWidth * scaleX;
-          windowPhysicalHeight = windowLogicalHeight * scaleY;
-        } else {
-          windowPhysicalWidth = windowLogicalWidth;
-          windowPhysicalHeight = windowLogicalHeight;
-        }
-        
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Window physical size: ${windowPhysicalWidth}x${windowPhysicalHeight}\n`);
-        
-        // What window_capture should produce
-        const targetWindowWidth = Math.min(Math.round(windowPhysicalWidth * 0.5), 1280);
-        const targetWindowHeight = Math.min(Math.round(windowPhysicalHeight * 0.5), 720);
-        
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Expected AI window size: ${targetWindowWidth}x${targetWindowHeight}\n`);
-        
-        // But based on previous debug output, AI sees something different
-        // Let's try different assumptions and see which matches the 2.0 scale factor
-        const assumption1_Width = windowLogicalWidth; // AI sees logical size
-        const assumption2_Width = windowPhysicalWidth; // AI sees physical size  
-        const assumption3_Width = targetWindowWidth; // AI sees expected scaled size
-        const assumption4_Width = windowLogicalWidth / 2; // AI sees half logical
-        
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Testing scale factor assumptions:\n`);
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - If AI sees logical (${assumption1_Width}): scale = ${(windowLogicalWidth / assumption1_Width).toFixed(3)}\n`);
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - If AI sees physical (${assumption2_Width}): scale = ${(windowLogicalWidth / assumption2_Width).toFixed(3)}\n`);
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - If AI sees expected (${assumption3_Width}): scale = ${(windowLogicalWidth / assumption3_Width).toFixed(3)}\n`);
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - If AI sees half logical (${assumption4_Width}): scale = ${(windowLogicalWidth / assumption4_Width).toFixed(3)}\n`);
-        
-        // Based on debug logs: AI sees the FULL physical window size since resize failed
-        // Window physical: 396x700, AI coordinates should be scaled down to logical: 198x350
-        const actualAiWindowWidth = windowPhysicalWidth;  // 396 for our window
-        const actualAiWindowHeight = windowPhysicalHeight; // 700 for our window
-        
-        const windowAiToLogicalScaleX = windowLogicalWidth / actualAiWindowWidth;
-        const windowAiToLogicalScaleY = windowLogicalHeight / actualAiWindowHeight;
-        
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Using AI window size: ${actualAiWindowWidth}x${actualAiWindowHeight}\n`);
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Scale factors: X=${windowAiToLogicalScaleX.toFixed(3)}, Y=${windowAiToLogicalScaleY.toFixed(3)}\n`);
-        
-        // Scale coordinates from AI window coordinates to logical window coordinates
-        let scaledX = Math.round(x * windowAiToLogicalScaleX);
-        let scaledY = Math.round(y * windowAiToLogicalScaleY);
-        
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Input AI coords: (${x}, ${y})\n`);
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Scaled to logical: (${scaledX}, ${scaledY})\n`);
-        
-        // Then add window position to scaled coordinates
-        moveX = scaledX + targetWindow.bounds.x;
-        moveY = scaledY + targetWindow.bounds.y;
-        
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Final screen coords: (${moveX}, ${moveY})\n`);
-        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_MOVE DEBUG: Window bounds check: X in [${targetWindow.bounds.x}, ${targetWindow.bounds.x + targetWindow.bounds.width}], Y in [${targetWindow.bounds.y}, ${targetWindow.bounds.y + targetWindow.bounds.height}]\n`);
-      } else {
-        // For regular screen coordinates, convert from AI screenshot coordinates to logical coordinates
-        // using the calculated scaling factors
-        moveX = Math.round(moveX * aiToLogicalScaleX);
-        moveY = Math.round(moveY * aiToLogicalScaleY);
+      // Always focus window first if windowId is provided
+      const focusResult = await capabilityImplementations.focus_window({ windowId });
+      if (!focusResult.success) {
+        return focusResult;
       }
+      // Wait for window to focus
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // We only support window-relative coordinates now, as it's the only reliable method.
+      
+      if (!windowId) {
+        return { success: false, error: 'windowId is a required parameter for mouse_move.' };
+      }
+      
+      // Ensure we have recent metadata for this window from a window_capture call
+      if (!global.windowCaptureMetadata || !global.windowCaptureMetadata[windowId]) {
+        return { success: false, error: `No window capture metadata found for window ID: ${windowId}. Please run window_capture first.` };
+      }
+      
+      const metadata = global.windowCaptureMetadata[windowId];
+      const age = Date.now() - metadata.timestamp;
+      
+      if (age > 5 * 60 * 1000) {
+        return { success: false, error: `Window capture metadata is stale (${(age/1000).toFixed(1)}s old). Please run window_capture again.` };
+      }
+      
+      const activeWin = require('active-win');
+      const windows = await activeWin.getOpenWindows();
+      const targetWindow = windows.find(w => w && w.id === windowId);
+      
+      if (!targetWindow) {
+        return { success: false, error: `Window not found for coordinate conversion with ID: ${windowId}` };
+      }
+      
+      // Define a configurable title bar height for macOS
+      const MACOS_TITLE_BAR_HEIGHT = 28;
+
+      // The scaling factor is the ratio of the window's original logical size 
+      // to the final size of the image that was sent to the AI.
+      const scaleX = metadata.originalLogicalSize.width / metadata.aiImageSize.width;
+      const scaleY = metadata.originalLogicalSize.height / metadata.aiImageSize.height;
+
+      // Scale the AI's coordinates to find the position within the logical window
+      let scaledX = Math.round(x * scaleX);
+      let scaledY = Math.round(y * scaleY);
+
+      // Add the window's origin to get the final screen coordinates.
+      moveX = targetWindow.bounds.x + scaledX;
+      moveY = targetWindow.bounds.y + scaledY;
+
+      // Log the complete transformation for easy debugging
+      const logTimestamp = new Date().toISOString();
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `\n=== MOUSE_MOVE_TRANSFORM ${logTimestamp} ===\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - AI Coords: (${x}, ${y})\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - AI Image Size: ${metadata.aiImageSize.width}x${metadata.aiImageSize.height}\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - Logical Window Size: ${metadata.originalLogicalSize.width}x${metadata.originalLogicalSize.height}\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - Scale Factors: X=${scaleX.toFixed(3)}, Y=${scaleY.toFixed(3)}\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - Scaled Coords: (${scaledX}, ${scaledY})\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - Window Origin: (${targetWindow.bounds.x}, ${targetWindow.bounds.y})\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `  - Final Screen Coords: (${moveX}, ${moveY})\n`);
       
       robot.moveMouse(moveX, moveY);
       
       if (debug) {
+        const sharp = require('sharp');
+        const timestamp = Date.now();
+        
+        // First, if windowInsideCoordinates, capture and save the window with intended click point
+        try {
+          fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', 
+            `DEBUG: Attempting to capture window ${windowId} for debug...\n`);
+          
+          const windowCapture = await capabilityImplementations.window_capture({ windowId });
+          
+          if (!windowCapture || windowCapture.isError) {
+            fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', 
+              `DEBUG: Window capture failed: ${windowCapture ? windowCapture.error : 'null response'}\n`);
+          } else if (windowCapture.content && windowCapture.content[1]) {
+            const windowImgBuffer = Buffer.from(windowCapture.content[1].data, 'base64');
+            
+            // Get metadata to understand the image size
+            const windowMeta = await sharp(windowImgBuffer).metadata();
+            fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', 
+              `DEBUG: Window image size: ${windowMeta.width}x${windowMeta.height}, format: ${windowMeta.format}\n`);
+            
+            // Create a red circle at the intended click position
+            const circleSize = 10;
+            
+            // The debug window image size should match the AI image size from metadata
+            const scaleFactorForDebugX = windowMeta.width / metadata.aiImageSize.width;
+            const scaleFactorForDebugY = windowMeta.height / metadata.aiImageSize.height;
+            
+            fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log',
+              `DEBUG: Using metadata scale - Window debug image: ${windowMeta.width}x${windowMeta.height}, AI saw: ${metadata.aiImageSize.width}x${metadata.aiImageSize.height}\n`);
+            
+            const scaledX = Math.round(originalX * scaleFactorForDebugX);
+            const scaledY = Math.round(originalY * scaleFactorForDebugY);
+            
+            fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log',
+              `DEBUG: Original AI coordinates: (${originalX}, ${originalY}), Scaled for window capture: (${scaledX}, ${scaledY})\n`);
+            fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log',
+              `DEBUG: Circle will be placed at top=${Math.round(scaledY - circleSize/2)}, left=${Math.round(scaledX - circleSize/2)}\n`);
+            
+            const circle = Buffer.from(
+              `<svg width="${circleSize}" height="${circleSize}">
+                <circle cx="${circleSize/2}" cy="${circleSize/2}" r="${circleSize/2-1}" 
+                        fill="red" fill-opacity="0.7" stroke="darkred" stroke-width="2"/>
+                <circle cx="${circleSize/2}" cy="${circleSize/2}" r="1" fill="white"/>
+              </svg>`
+            );
+            
+            // Mark the intended position in the window capture with scaled coordinates
+            const markedWindow = await sharp(windowImgBuffer)
+              .composite([{
+                input: circle,
+                top: Math.max(0, Math.round(scaledY - circleSize/2)),
+                left: Math.max(0, Math.round(scaledX - circleSize/2))
+              }])
+              .jpeg({ quality: 80 })
+              .toBuffer();
+            
+            // Save the marked window capture
+            const windowDebugPath = `/Users/lukasz/GitHub/mcp-desktop-pro/debug_window_${timestamp}.jpg`;
+            fs.writeFileSync(windowDebugPath, markedWindow);
+            fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', 
+              `DEBUG: Saved window capture with intended click at (${originalX}, ${originalY}) to ${windowDebugPath}\n`);
+            
+            // Also save without mark for comparison
+            const unmarkedPath = `/Users/lukasz/GitHub/mcp-desktop-pro/debug_window_unmarked_${timestamp}.jpg`;
+            fs.writeFileSync(unmarkedPath, windowImgBuffer);
+            fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', 
+              `DEBUG: Saved unmarked window capture to ${unmarkedPath}\n`);
+          } else {
+            fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', 
+              `DEBUG: Window capture response missing content\n`);
+          }
+        } catch (err) {
+          fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', 
+            `DEBUG: Error in window debug save: ${err.message}\n${err.stack}\n`);
+        }
+        
         // Take a screenshot to show where the cursor is positioned
         const screenshot = await capabilityImplementations.screen_capture();
         
@@ -314,8 +361,18 @@ const capabilityImplementations = {
           
           const annotatedImgBase64 = annotatedImg.toString('base64');
           
+          // Save the full screenshot with actual cursor position
+          try {
+            const fullScreenDebugPath = `/Users/lukasz/GitHub/mcp-desktop-pro/debug_fullscreen_${timestamp}.jpg`;
+            await sharp(annotatedImg).toFile(fullScreenDebugPath);
+            fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', 
+              `DEBUG: Saved full screenshot with actual cursor at (${actualCursorPos.x}, ${actualCursorPos.y}) to ${fullScreenDebugPath}\n`);
+          } catch (err) {
+            // Silently ignore errors in debug saving
+          }
+          
           const transformations = [];
-          if (windowInsideCoordinates && windowId) {
+          if (windowId) {
             const windows = await require('active-win').getOpenWindows();
             const targetWindow = windows.find(w => w.id === windowId);
             if (targetWindow) {
@@ -335,25 +392,40 @@ const capabilityImplementations = {
                 windowPhysicalHeight = windowLogicalHeight;
               }
               
-              const targetWindowWidth = Math.min(Math.round(windowPhysicalWidth * 0.5), 1280);
-              const targetWindowHeight = Math.min(Math.round(windowPhysicalHeight * 0.5), 720);
+              // Target window size if resize was working (currently unused)
+              // const targetWindowWidth = Math.min(Math.round(windowPhysicalWidth * 0.5), 1280);
+              // const targetWindowHeight = Math.min(Math.round(windowPhysicalHeight * 0.5), 720);
               
-              const actualAiWindowWidth = windowLogicalWidth / 2;
-              const actualAiWindowHeight = windowLogicalHeight / 2;
+              const actualAiWindowWidth = windowPhysicalWidth;
+              const actualAiWindowHeight = windowPhysicalHeight;
               const windowAiToLogicalScaleX = windowLogicalWidth / actualAiWindowWidth;
               const windowAiToLogicalScaleY = windowLogicalHeight / actualAiWindowHeight;
               
-              const step1X = Math.round(x * windowAiToLogicalScaleX);
-              const step1Y = Math.round(y * windowAiToLogicalScaleY);
-              transformations.push(`window AI coords (${x}, ${y}) -> window logical (${step1X}, ${step1Y})`);
-              transformations.push(`window scale factors: X=${windowAiToLogicalScaleX.toFixed(3)}, Y=${windowAiToLogicalScaleY.toFixed(3)}`);
+              // Recalculate with correct AI window size for debug output
+              const debugTargetWidth = Math.min(Math.round(windowPhysicalWidth * 0.5), 1280);
+              const debugTargetHeight = Math.min(Math.round(windowPhysicalHeight * 0.5), 720);
+              let debugAiWidth, debugAiHeight;
+              if (debugTargetWidth < windowPhysicalWidth || debugTargetHeight < windowPhysicalHeight) {
+                debugAiWidth = debugTargetWidth;
+                debugAiHeight = debugTargetHeight;
+              } else {
+                debugAiWidth = windowPhysicalWidth;
+                debugAiHeight = windowPhysicalHeight;
+              }
+              const debugScaleX = windowLogicalWidth / debugAiWidth;
+              const debugScaleY = windowLogicalHeight / debugAiHeight;
+              
+              const step1X = Math.round(x * debugScaleX);
+              const step1Y = Math.round(y * debugScaleY);
+              transformations.push(`window AI coords (${x}, ${y}) in ${debugAiWidth}x${debugAiHeight} image -> window logical (${step1X}, ${step1Y})`);
+              transformations.push(`window scale factors: X=${debugScaleX.toFixed(3)}, Y=${debugScaleY.toFixed(3)}`);
               transformations.push(`final screen coords (${step1X + targetWindow.bounds.x}, ${step1Y + targetWindow.bounds.y})`);
             }
           } else {
-            const step1X = Math.round(x * aiToLogicalScaleX);
-            const step1Y = Math.round(y * aiToLogicalScaleY);
+            const step1X = Math.round(x * scaleX);
+            const step1Y = Math.round(y * scaleY);
             transformations.push(`AI coords (${x}, ${y}) -> logical coords (${step1X}, ${step1Y})`);
-            transformations.push(`scale factors: X=${aiToLogicalScaleX.toFixed(3)}, Y=${aiToLogicalScaleY.toFixed(3)}`);
+            transformations.push(`scale factors: X=${scaleX.toFixed(3)}, Y=${scaleY.toFixed(3)}`);
           }
           
           return {
@@ -375,6 +447,13 @@ const capabilityImplementations = {
       
       return { success: true };
     } catch (error) {
+      // Log any unexpected errors to the debug file for inspection
+      const errorTimestamp = new Date().toISOString();
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `--- MOUSE_MOVE CRITICAL ERROR ${errorTimestamp} ---\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `Error: ${error.message}\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `Stack: ${error.stack}\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `-------------------------------------\n`);
+
       // Error captured silently to avoid interfering with MCP protocol
       return { success: false, error: error.message };
     }
@@ -389,41 +468,52 @@ const capabilityImplementations = {
         pressLength = 0,
         x,
         y,
-        windowInsideCoordinates = false
+        debug = false
       } = params;
+
+      // Add a timestamped log to mark the beginning of the function call
+      const timestamp = new Date().toISOString();
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `\n--- MOUSE_CLICK START ${timestamp} ---\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `Params: ${JSON.stringify(params)}\n`);
 
       // Validate pressLength
       if (pressLength < 0 || pressLength > 5000) {
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_CLICK ERROR: Invalid pressLength\n`);
         return { success: false, error: 'pressLength must be between 0 and 5000 milliseconds' };
       }
 
-      // If coordinates are provided, move mouse first
+      // Always focus window first if windowId is provided
+      if (windowId) {
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_CLICK: Focusing window ${windowId}\n`);
+        const focusResult = await capabilityImplementations.focus_window({ windowId });
+        if (!focusResult.success) {
+          fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_CLICK ERROR: Failed to focus window: ${focusResult.error}\n`);
+          return focusResult;
+        }
+        // Wait for window to focus
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      
+      // If coordinates are provided, move mouse
       if (x !== undefined && y !== undefined) {
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_CLICK: Calling mouse_move with x=${x}, y=${y}\n`);
         const moveResult = await capabilityImplementations.mouse_move({
           x,
           y,
-          windowInsideCoordinates,
-          windowId
+          windowId,
+          debug // Pass debug flag through
         });
         
         if (!moveResult.success) {
+          fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_CLICK ERROR: mouse_move failed: ${moveResult.error}\n`);
           return moveResult;
         }
         
         // Small delay after move to ensure position is set
         await new Promise(resolve => setTimeout(resolve, 50));
-      } else {
-        // Focus window if windowId is provided and no coordinates (legacy behavior)
-        if (windowId) {
-          const focusResult = await capabilityImplementations.focus_window({ windowId });
-          if (!focusResult.success) {
-            return focusResult;
-          }
-          // Wait for window to focus
-          await new Promise(resolve => setTimeout(resolve, 300));
-        }
       }
 
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_CLICK: Performing click action (button: ${button}, double: ${double}, pressLength: ${pressLength})\n`);
       if (pressLength > 0) {
         // Hold mouse button for specified duration
         robot.mouseToggle('down', button);
@@ -432,14 +522,31 @@ const capabilityImplementations = {
       } else {
         // Quick click (default behavior)
         if (double) {
-          robot.mouseClick(button, double);
+          fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_CLICK: Trying native robotjs double-click with robot.mouseClick('${button}', true)\n`);
+          // Try native robotjs double-click first
+          robot.mouseClick(button, true);
+          
+          // If that doesn't work, fall back to two clicks
+          // Uncomment these lines if native double-click doesn't work:
+          // robot.mouseClick(button);
+          // await new Promise(resolve => setTimeout(resolve, 200)); 
+          // robot.mouseClick(button);
         } else {
+          fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `MOUSE_CLICK: Executing single-click with robot.mouseClick('${button}')\n`);
           robot.mouseClick(button);
         }
       }
 
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `--- MOUSE_CLICK END ---\n`);
       return { success: true };
     } catch (error) {
+      // Log any unexpected errors to the debug file for inspection
+      const errorTimestamp = new Date().toISOString();
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `--- MOUSE_CLICK CRITICAL ERROR ${errorTimestamp} ---\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `Error: ${error.message}\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `Stack: ${error.stack}\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `-------------------------------------\n`);
+
       // Error captured silently to avoid interfering with MCP protocol
       return { success: false, error: error.message };
     }
@@ -779,6 +886,11 @@ const capabilityImplementations = {
       const width = scaledX2 - scaledX1;
       const height = scaledY2 - scaledY1;
       
+      // Log extraction details for debugging
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `WINDOW_CAPTURE DEBUG: Window bounds: x=${bounds.x}, y=${bounds.y}, width=${bounds.width}, height=${bounds.height}\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `WINDOW_CAPTURE DEBUG: Scaled extraction: x1=${scaledX1}, y1=${scaledY1}, x2=${scaledX2}, y2=${scaledY2}\n`);
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `WINDOW_CAPTURE DEBUG: Extraction dimensions: width=${width}, height=${height}\n`);
+      
       if (width <= 0 || height <= 0) {
         return { success: false, error: 'Invalid window bounds: width and height must be positive' };
       }
@@ -801,15 +913,9 @@ const capabilityImplementations = {
       }
       
       // Apply AI optimization
-      let currentMeta;
-      try {
-        currentMeta = await sharpInstance.metadata();
-      } catch (metaError) {
-        return { success: false, error: `Metadata extraction failed: ${metaError.message}` };
-      }
-      
-      const currentWidth = currentMeta.width;
-      const currentHeight = currentMeta.height;
+      // Use the extraction dimensions, not metadata (which shows original image size)
+      const currentWidth = width;
+      const currentHeight = height;
       
       // Scale to 50% of original size, but cap at 1280x720 for much smaller responses
       const targetWidth = Math.min(Math.round(currentWidth * 0.5), 1280);
@@ -820,30 +926,47 @@ const capabilityImplementations = {
       const logMsg = `WINDOW_CAPTURE DEBUG: extracted window ${currentWidth}x${currentHeight}, target ${targetWidth}x${targetHeight}, will resize: ${targetWidth < currentWidth || targetHeight < currentHeight}\n`;
       fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', logMsg);
       
+      // Track actual dimensions that AI will see
+      let aiImageWidth = currentWidth;
+      let aiImageHeight = currentHeight;
+      
       // Only resize if the target is smaller than current
       if (targetWidth < currentWidth || targetHeight < currentHeight) {
         try {
           sharpInstance = sharpInstance.resize(targetWidth, targetHeight, {
-            fit: 'fill',
-            kernel: sharp.kernel.lanczos3
+            fit: 'inside',
+            withoutEnlargement: true
           });
           
-          const finalMeta = await sharpInstance.metadata();
-          const logMsg2 = `WINDOW_CAPTURE DEBUG: after resize ${finalMeta.width}x${finalMeta.height}\n`;
+          // With 'inside' fit, dimensions might be different from target
+          // We'll get the actual dimensions after processing
+          
+          const logMsg2 = `WINDOW_CAPTURE DEBUG: after resize, AI will see: ${aiImageWidth}x${aiImageHeight}\n`;
           fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', logMsg2);
         } catch (resizeError) {
           return { success: false, error: `Resize failed: ${resizeError.message}` };
         }
       } else {
-        const logMsg3 = `WINDOW_CAPTURE DEBUG: no resize needed\n`;
+        const logMsg3 = `WINDOW_CAPTURE DEBUG: no resize needed, AI will see: ${aiImageWidth}x${aiImageHeight}\n`;
         fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', logMsg3);
       }
+      
+      // Store the AI image dimensions in debug log for mouse_move to use
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', `WINDOW_CAPTURE DEBUG: windowId=${targetWindow.id}, aiDimensions=${aiImageWidth}x${aiImageHeight}\n`);
       
       // Convert to WebP with very aggressive compression for AI analysis
       try {
         img = await sharpInstance
           .webp({ quality: 15, effort: 0 })
           .toBuffer();
+          
+        // Get the actual dimensions after resize
+        const finalMeta = await sharp(img).metadata();
+        aiImageWidth = finalMeta.width;
+        aiImageHeight = finalMeta.height;
+        
+        fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', 
+          `WINDOW_CAPTURE DEBUG: actual AI dimensions after resize: ${aiImageWidth}x${aiImageHeight}\n`);
       } catch (webpError) {
         return { success: false, error: `WebP conversion failed: ${webpError.message}` };
       }
@@ -855,11 +978,13 @@ const capabilityImplementations = {
       }
       
       const base64 = img.toString('base64');
-      return {
+      
+      // Return window capture with dimension metadata
+      const result = {
         content: [
           {
             type: "text",
-            text: `Window "${targetWindow.title}" captured successfully.`,
+            text: `Window "${targetWindow.title}" captured successfully. Original size: ${bounds.width}x${bounds.height}, AI sees: ${aiImageWidth}x${aiImageHeight}`,
           },
           {
             type: "image",
@@ -869,6 +994,32 @@ const capabilityImplementations = {
         ],
         isError: false
       };
+      
+      // Store window capture metadata for coordinate transformations
+      // We assume the AI pipeline will not perform additional resizing.
+      const aiActualWidth = aiImageWidth;
+      const aiActualHeight = aiImageHeight;
+      
+      const windowCaptureMetadata = {
+        windowId: targetWindow.id,
+        originalLogicalSize: { width: bounds.width, height: bounds.height },
+        originalPhysicalSize: { width: currentWidth, height: currentHeight },
+        reportedAiSize: { width: aiImageWidth, height: aiImageHeight },
+        aiImageSize: { width: aiActualWidth, height: aiActualHeight }, // What AI actually sees
+        timestamp: Date.now()
+      };
+      
+      // Store in global map for mouse_move to access
+      if (!global.windowCaptureMetadata) {
+        global.windowCaptureMetadata = {};
+      }
+      global.windowCaptureMetadata[targetWindow.id] = windowCaptureMetadata;
+      
+      // Add metadata to debug log
+      fs.appendFileSync('/Users/lukasz/GitHub/mcp-desktop-pro/debug.log', 
+        `WINDOW_CAPTURE METADATA: ${JSON.stringify(windowCaptureMetadata)}\n`);
+      
+      return result;
       
     } catch (error) {
       // Error captured silently to avoid interfering with MCP protocol
@@ -1023,22 +1174,20 @@ server.tool("keyboard_type", "Types text at the current cursor position. IMPORTA
   windowId: z.number().optional().describe("Window ID to focus before typing. SHOULD be provided if known from previous operations (after window_capture, list_windows, or when user specified a window).")
 }, async (params) => toMcpResponse(await capabilityImplementations.keyboard_type(params)));
 
-server.tool("mouse_click", "Performs a mouse click, optionally moving to coordinates first. IMPORTANT: windowId should be provided if known (after window_capture, list_windows, or in continuation).", {
+server.tool("mouse_click", "Performs a mouse click, optionally moving to coordinates first. IMPORTANT: a windowId MUST be provided. When clicking buttons (especially in grids like calculators), aim for the center of the button rather than edges to ensure reliable clicks.", {
   button: z.enum(["left", "right", "middle"]).default("left").describe("Mouse button to click"),
   double: z.boolean().default(false).describe("Whether to perform a double click"),
-  windowId: z.number().optional().describe("Window ID to focus before clicking. SHOULD be provided if known from previous operations (after window_capture, list_windows, or when user specified a window)."),
+  windowId: z.number().describe("Window ID to focus before clicking. This is a required parameter."),
   pressLength: z.number().min(0).max(5000).default(0).describe("Optional duration to hold the mouse button in milliseconds (0-5000ms, 0 = quick click)"),
-  x: z.number().optional().describe("X coordinate to move to before clicking"),
-  y: z.number().optional().describe("Y coordinate to move to before clicking"),
-  windowInsideCoordinates: z.boolean().default(false).describe("If true, x/y coordinates are relative to window (requires windowId). REQUIRED when coordinates come from window_capture.")
+  x: z.number().optional().describe("X coordinate to move to before clicking (aim for button centers, not edges)"),
+  y: z.number().optional().describe("Y coordinate to move to before clicking (aim for button centers, not edges)"),
 }, async (params) => toMcpResponse(await capabilityImplementations.mouse_click(params)));
 
-server.tool("mouse_move", "Moves the mouse to specified coordinates. Automatically handles Retina scaling. IMPORTANT: windowInsideCoordinates is OBLIGATORY when coordinates come from window_capture analysis (not for screen_capture).", {
-  x: z.number().describe("X coordinate"),
-  y: z.number().describe("Y coordinate"),
+server.tool("mouse_move", "Moves the mouse to specified coordinates within a given window. A windowId is required. IMPORTANT: When clicking buttons (especially in grids like calculators), aim for the center of the button rather than edges to ensure reliable clicks.", {
+  x: z.number().describe("X coordinate relative to the window"),
+  y: z.number().describe("Y coordinate relative to the window"),
   debug: z.boolean().default(false).describe("If true, takes a screenshot with a red circle showing where the cursor moved for verification"),
-  windowInsideCoordinates: z.boolean().default(false).describe("If true, coordinates are relative to a window and will be converted to absolute screen coordinates (requires windowId). REQUIRED when using coordinates from window_capture."),
-  windowId: z.number().optional().describe("Window ID required when using windowInsideCoordinates")
+  windowId: z.number().describe("Window ID is required for all mouse movements.")
 }, async (params) => {
   const result = await capabilityImplementations.mouse_move(params);
   if (result.content) {
@@ -1082,7 +1231,7 @@ server.tool("multiple_desktop_actions", "Executes a sequence of desktop actions 
 server.resource(
   "screenshot-list",
   "screenshot://list",
-  async (uri) => {
+  async () => {
     const result = {
       contents: [
         ...Object.keys(screenshots).map(name => ({

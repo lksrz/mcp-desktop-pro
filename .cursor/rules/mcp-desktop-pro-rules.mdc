@@ -1,0 +1,7 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+- Console logging is prohibited as it breaks the MCP stdio protocol
+- Ask USER to restart the MCP server after each code change to test and debug with fresh code

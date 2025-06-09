@@ -13,7 +13,22 @@
       "Bash(npm publish:*)",
       "Bash(npm pkg fix:*)",
       "Bash(git pull:*)",
-      "Bash(git rebase:*)"
+      "Bash(git rebase:*)",
+      "Bash(git commit:*)",
+      "Bash(rg:*)",
+      "mcp__desktop-automation__list_windows",
+      "mcp__desktop-automation__window_capture",
+      "mcp__desktop-automation__mouse_click",
+      "mcp__desktop-automation__mouse_move",
+      "mcp__desktop-automation__focus_window",
+      "Bash(python3:*)",
+      "mcp__desktop-automation__multiple_desktop_actions",
+      "Bash(npm rebuild:*)",
+      "Bash(ls:*)",
+      "Bash(rm:*)",
+      "mcp__desktop-automation__screen_capture",
+      "mcp__desktop-automation__keyboard_press",
+      "mcp__desktop-automation__keyboard_type"
     ],
     "deny": []
   }
