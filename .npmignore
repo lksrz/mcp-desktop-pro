@@ -1,0 +1,59 @@
+# Development and IDE files
+.git/
+.github/
+.cursor/
+.claude/
+.vscode/
+.idea/
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Images and media (not needed in package)
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.webp
+
+# Development documentation
+CLAUDE.md
+
+# Test files
+test/
+tests/
+*.test.js
+*.spec.js
+coverage/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Backup files
+*.bak
+*.tmp
+*.swp
+*~ 
