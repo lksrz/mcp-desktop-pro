@@ -645,7 +645,7 @@ This error occurs when Claude Desktop uses a different Node.js version than the 
 
 ## Credits
 
-This project is based on [mcp-desktop-automation](https://github.com/tanob/mcp-desktop-automation) by Adriano Bonat, with significant enhancements and new features added by Lukasz Rzepecki.
+This project was created and is maintained by Lukasz Rzepecki. It was initially based on [mcp-desktop-automation](https://github.com/tanob/mcp-desktop-automation) by Adriano Bonat, with significant enhancements and new features added.
 
 ## License
 
