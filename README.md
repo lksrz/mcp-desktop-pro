@@ -1,20 +1,20 @@
 # MCP Desktop Pro
 
-An advanced Model Context Protocol server for comprehensive desktop automation with **advanced window management**, visual debugging, and Retina display support. This server enables LLMs to intelligently control mouse movements, keyboard inputs, capture screenshots, **manage and target specific windows**, and perform precise automation tasks with visual feedback and window-relative coordinate systems.
+An advanced Model Context Protocol server for comprehensive **computer use** and **AI agent automation** with **advanced window management**, visual debugging, and Retina display support. This server enables **AI operators** and LLMs to intelligently control mouse movements, keyboard inputs, capture screenshots, **manage and target specific windows**, and perform precise **autonomous computer control** tasks with visual feedback and window-relative coordinate systems.
 
-Ideal for testing apps, games, and running desktop tasks locally with AI agents through Model Context Protocol.
+Ideal for **AI-powered automation**, testing apps, games, and running desktop tasks locally with AI agents through Model Context Protocol.
 
 ## 🚀 Main Advantages
 
-- 🪟 **Advanced Window Management**: Target specific windows with precise coordinate conversion and AppleScript integration
-- ⚡ **Multi-Action Chaining**: Execute complex automation sequences with timing control and error handling
-- 🖼️ **AI-Optimized Screenshots**: Aggressive compression, scaling, and WebP format optimized for small response sizes
-- 🍎 **Native macOS Support**: Seamless integration with macOS window system and Retina displays
-- 🎯 **Visual Debugging**: Real-time cursor position verification with visual feedback
+- 🪟 **Advanced Window Management**: Target specific windows with precise coordinate conversion and cross-platform integration
+- ⚡ **Multi-Action Chaining**: Execute complex **AI automation** sequences with timing control and error handling
+- 🖼️ **AI-Optimized Screenshots**: Aggressive compression, scaling, and WebP format optimized for **computer vision** processing
+- 🌐 **Cross-Platform Support**: Full support for macOS, Windows, and Linux with platform-specific optimizations
+- 🎯 **Visual Debugging**: Real-time cursor position verification with visual feedback for **intelligent UI automation**
 
 ## ⚠️ Important Limitation
 
-**Secondary Display Screenshots**: AI agents cannot capture screenshots of windows on secondary/external displays. Both `screen_capture` and `window_capture` only work on the primary display. Mouse/keyboard automation still works across all displays using window-relative coordinates.
+**Secondary Display Screenshots**: AI agents cannot capture screenshots of windows on secondary/external displays. Both `screen_capture` and `window_capture` only work on the primary display. **Workaround**: Use `move_window_to_primary_screen` to relocate windows for capture. Mouse/keyboard automation works across all displays using window-relative coordinates.
 
 ## Configuration to use MCP Desktop Pro
 
@@ -90,12 +90,12 @@ When first running this MCP server, you may need to grant these permissions in y
 
 ## Key Features
 
-- **AI-Optimized Screenshots**: Aggressive 50% scaling, WebP compression (quality 15), and strict size limits (max 300KB) for optimal response sizes
-- **Multi-Action Automation**: Execute sequences of actions with precise timing control and configurable error handling
-- **Advanced Window Management**: List, focus, capture, and precisely target specific windows with intelligent window detection
-- **Window-Relative Coordinates**: Click elements within specific windows accurately with automatic coordinate transformation
-- **Visual Debugging**: Mouse position verification with red circle overlay
-- **Retina Display Support**: Automatic scaling detection and coordinate conversion
+- **AI-Optimized Screenshots**: Aggressive 50% scaling, WebP compression (quality 15), and strict size limits (max 300KB) for optimal **computer vision** processing
+- **Multi-Action Automation**: Execute sequences of **AI agent** actions with precise timing control and configurable error handling
+- **Advanced Window Management**: List, focus, capture, and precisely target specific windows with **intelligent UI automation**
+- **Window-Relative Coordinates**: Click elements within specific windows accurately with automatic coordinate transformation for **vision-guided automation**
+- **Visual Debugging**: Mouse position verification with red circle overlay for **autonomous computer control**
+- **Cross-Platform Support**: Full support for macOS, Windows, and Linux with platform-specific **AI operator** optimizations
 - **Press Duration Control**: Hold keys or mouse buttons for specified durations
 - **WebP Format**: Optimized WebP format for better compression and faster AI processing
 - **AppleScript Integration**: Reliable window focusing on macOS
@@ -140,7 +140,7 @@ When first running this MCP server, you may need to grant these permissions in y
     - `windowId` (number, optional): Window ID from list_windows
     - `windowTitle` (string, optional): Window title (partial match)
   - Features: Automatic focusing, precise window bounds capture, 50% scaling with WebP compression
-  - ⚠️ **Secondary display limitation**: Coordinate handling for windows on secondary displays not fully implemented
+  - ⚠️ **Secondary display limitation**: Window capture not supported on secondary displays - use `move_window_to_primary_screen` first
 
 #### Mouse Control
 
@@ -490,7 +490,7 @@ All mouse operations use window-relative coordinates:
 
 ### Recent Fixes and Improvements
 - **Aspect ratio preservation**: Window captures now use `fit: 'inside'` to maintain proper aspect ratios
-- **Title bar offset removed**: Fixed Y-axis positioning errors by removing incorrect MACOS_TITLE_BAR_HEIGHT
+- **Title bar offset removed**: Fixed Y-axis positioning errors by removing incorrect title bar height offset (previous implementation detail)
 - **Double-click fixed**: Native robotjs double-click now works correctly with proper syntax
 - **Button center targeting**: Tool descriptions updated to guide users to click button centers for reliability
 
@@ -510,15 +510,15 @@ All mouse operations use window-relative coordinates:
   - Requires: `sudo apt-get install wmctrl` (Ubuntu/Debian)
   - Optional: `sudo apt-get install xdotool` (for additional window control options)
 
-## Performance Optimizations
+## Performance Optimizations for AI Computer Use
 
-- **Automatic AI Optimization**: All screenshots are automatically optimized for AI processing
-- **50% Scaling**: Images are scaled to 50% of original size for faster processing
+- **Automatic AI Model Optimization**: All screenshots are automatically optimized for **computer vision** and AI processing
+- **50% Scaling**: Images are scaled to 50% of original size for faster **AI agent** processing
 - **Size Capping**: Maximum dimensions limited to 1920x1080 even after 50% scaling
-- **WebP Compression**: Aggressive WebP compression (quality 40) for smallest file sizes
-- **Coordinate Caching**: Window information cached during operations
+- **WebP Compression**: Aggressive WebP compression (quality 40) for smallest file sizes and optimal **autonomous decision making**
+- **Coordinate Caching**: Window information cached during operations for efficient **AI operator** workflows
 - **Efficient Scaling**: Automatic Retina detection minimizes unnecessary processing
-- **Size Limits**: Optimized to stay well under 1MB response limits
+- **Size Limits**: Optimized to stay well under 1MB response limits for fast **computer use** automation
 
 ### Screenshot Optimization Details:
 - **Original 4K screenshot**: ~8MB → **Optimized**: ~200KB (40x smaller!)
@@ -526,7 +526,7 @@ All mouse operations use window-relative coordinates:
 - **WebP format**: 25-35% smaller than equivalent JPEG
 - **Quality 40**: Optimal balance between file size and AI readability
 
-## Multi-Display Support
+## Multi-Display & AI Computer Use Support
 
 ✅ **Full multi-display automation support!**
 - **Window detection**: Finds windows across all displays
@@ -545,10 +545,9 @@ All mouse operations use window-relative coordinates:
 ## Limitations
 
 - **Screenshot capture**: Both `screen_capture()` and `window_capture()` are limited to primary display only
-- **Secondary display support**: AI agents cannot "see" or capture screenshots of windows on secondary/external displays *(but can now move them to primary display using `move_window_to_primary_screen`)*
+  - **Workaround**: Use `move_window_to_primary_screen()` to relocate windows for capture
 - **Direct coordinate mouse control**: Limited to primary display (use `windowInsideCoordinates` for cross-display)
 - Primarily tested with Claude Desktop, Claude Code and Cursor
-- **Cross-platform**: Full support for macOS, Windows, and Linux with platform-specific optimizations
 
 ## Troubleshooting
 

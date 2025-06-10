@@ -136,3 +136,4 @@ Screenshots are optimized for AI processing - all images are WebP format with ag
 ### Real time development and debugging
 - Console logging is prohibited as it breaks the MCP stdio protocol
 - Ask USER to restart the MCP server after each code change to test and debug with fresh code
+- Do not add any Claude co-authored attributions

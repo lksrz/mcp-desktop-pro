@@ -1,7 +1,7 @@
 {
   "name": "mcp-desktop-pro",
-  "version": "0.3.0",
-  "description": "Advanced MCP server for desktop automation with intelligent window management, multi-action chaining, window-relative coordinates, visual debugging, and Retina display support",
+  "version": "0.3.1",
+  "description": "Advanced MCP server for intelligent computer use automation and AI agent operator control. Supports mouse and keyboard input, window-relative vision and coordinates, Retina display, and screenshot-based debugging. Designed for AI-driven workflows, app and game testing, and local autonomous task execution.",
   "type": "commonjs",
   "main": "server.js",
   "bin": {
@@ -13,19 +13,26 @@
   },
   "keywords": [
     "mcp",
-    "modelcontextprotocol",
+    "model-context-protocol",
     "automation",
-    "desktop",
+    "computer-use",
+    "ai-operator",
+    "desktop-automation",
+    "desktop-operator",
     "testing",
     "screenshot",
     "robotjs",
-    "visual-debugging"
+    "visual-debugging",
+    "app-testing",
+    "mouse-control",
+    "keyboard-control",
+    "ai-agent"
   ],
   "author": "Lukasz Rzepecki <http://linkedin.com/in/lukaszrzepecki/>",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/lukaszrzepecki/mcp-desktop-pro.git"
+    "url": "git+https://github.com/lksrz/mcp-desktop-pro"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.7.0",
