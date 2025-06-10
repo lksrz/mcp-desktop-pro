@@ -28,7 +28,9 @@
       "Bash(rm:*)",
       "mcp__desktop-automation__screen_capture",
       "mcp__desktop-automation__keyboard_press",
-      "mcp__desktop-automation__keyboard_type"
+      "mcp__desktop-automation__keyboard_type",
+      "Bash(find:*)",
+      "Bash(timeout:*)"
     ],
     "deny": []
   }

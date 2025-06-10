@@ -46,6 +46,36 @@ Here's how to configure Claude Desktop to use the MCP Desktop Pro server:
 }
 ```
 
+### Local Development with Debug Mode
+
+```json
+{
+  "mcpServers": {
+    "desktop-pro": {
+      "command": "node",
+      "args": ["/path/to/mcp-desktop-pro/server.js", "--debug"]
+    }
+  }
+}
+```
+
+## Command Line Options
+
+The server supports the following command line arguments:
+
+- `--debug`: Enable comprehensive debug logging
+  - Creates `debug.log` file with detailed operation logs
+  - Saves debug screenshots for mouse operations
+  - Logs coordinate transformations and error details
+- `--help, -h`: Show help message with usage information
+
+**Examples:**
+```bash
+node server.js              # Start server in normal mode
+node server.js --debug      # Start server with debug logging enabled
+node server.js --help       # Show help message
+```
+
 ### Permissions
 
 This server requires system-level permissions to:
@@ -96,6 +126,14 @@ When first running this MCP server, you may need to grant these permissions in y
   - Input: `windowId` (number, required): Window ID from list_windows
   - Uses AppleScript for reliable window focusing on macOS
 
+- **move_window_to_primary_screen**
+  - Moves a window from secondary display to the primary screen, enabling screenshot capture
+  - Inputs:
+    - `windowId` (number, required): Window ID from list_windows
+    - `preserveSize` (boolean, optional, default: true): Keep original window size or resize to fit primary screen
+  - Automatically positions window on primary display and optionally resizes
+  - Enables window_capture for windows that were previously on secondary displays
+
 - **window_capture**
   - Focuses on a window and captures a screenshot of just that window (automatically optimized for AI analysis)
   - Inputs:
@@ -109,7 +147,7 @@ When first running this MCP server, you may need to grant these permissions in y
 - **mouse_move**
   - Moves the mouse to specified coordinates with automatic Retina scaling. When targeting buttons (especially in grids like calculators), aim for the center of the button rather than edges to ensure reliable clicks.
   - Inputs:
-    - `x`, `y` (numbers, required): Target coordinates relative to the specified window (aim for button centers, not edges)
+    - `x`, `y` (numbers, required): Target coordinates relative to the **TOP-LEFT corner (0,0) of the window screenshot/image**. NOT relative to any internal UI elements or content areas. Use coordinates exactly as they appear in the captured window image.
     - `windowId` (number, required): Window ID for coordinate conversion. All mouse movements must be relative to a window.
     - `debug` (boolean, optional): Show red circle at cursor position for verification
   - Features: Automatic scaling, visual debugging, window-relative positioning
@@ -121,7 +159,7 @@ When first running this MCP server, you may need to grant these permissions in y
     - `double` (boolean, optional): Whether to perform a double click (works correctly with native robotjs)
     - `windowId` (number, required): Focus window before clicking. This is a required parameter.
     - `pressLength` (number, optional, 0-5000ms): Duration to hold mouse button
-    - `x`, `y` (numbers, optional): Coordinates (relative to the window) to move to before clicking (aim for button centers, not edges)
+    - `x`, `y` (numbers, optional): Coordinates relative to the **TOP-LEFT corner (0,0) of the window screenshot/image** to move to before clicking. NOT relative to any internal UI elements. Use coordinates exactly as they appear in the captured window image. Aim for button centers, not edges.
   - Features: Move and click in one action, or click at current position within a focused window.
 
 #### Keyboard Control
@@ -219,11 +257,25 @@ The server provides access to screenshots:
 ## Advanced Usage Examples
 
 ### Window-Based Automation
+
+**Option 1: Basic workflow (simple, 1:1 coordinates)**
 ```javascript
 // 1. List windows to find target
 list_windows()
 
-// 2. Capture specific window
+// 2. Click directly (coordinates will be mapped 1:1 to window)
+mouse_click({
+  x: 150, y: 200,
+  windowId: 12345
+})
+```
+
+**Option 2: Precise workflow (with AI-optimized coordinate scaling)**
+```javascript
+// 1. List windows to find target
+list_windows()
+
+// 2. Capture specific window (creates precise coordinate metadata)
 window_capture({ windowId: 12345 })
 
 // 3. Option A: Move then click (two steps)
@@ -235,6 +287,27 @@ mouse_move({
 mouse_click({ windowId: 12345 })
 
 // 3. Option B: Move and click in one action
+mouse_click({
+  x: 150, y: 200,
+  windowId: 12345
+})
+```
+
+### Secondary Display to Primary Screen Workflow
+```javascript
+// 1. List windows to find target on secondary display
+list_windows()
+
+// 2. Move window from secondary to primary screen
+move_window_to_primary_screen({ 
+  windowId: 12345,
+  preserveSize: true  // Keep original size (default)
+})
+
+// 3. Now you can capture the window (was impossible before)
+window_capture({ windowId: 12345 })
+
+// 4. Perform automation as normal
 mouse_click({
   x: 150, y: 200,
   windowId: 12345
@@ -391,6 +464,16 @@ multiple_desktop_actions({
 
 ## Coordinate Systems
 
+### IMPORTANT: Coordinate Reference Point
+**All mouse coordinates (x, y) are relative to the TOP-LEFT corner (0,0) of the window screenshot/image that you see.**
+
+- ✅ **Correct**: Use coordinates as they appear in the captured window image
+- ✅ **Reference point**: Top-left corner of the window screenshot is (0,0)
+- ❌ **Incorrect**: Don't use coordinates relative to internal UI elements, content areas, or tabs
+- ❌ **Incorrect**: Don't add offsets for title bars, menus, or toolbars
+
+**Example**: If you see a button at position (150, 200) in the window screenshot, use exactly `x: 150, y: 200` - the system handles all scaling and positioning automatically.
+
 ### Screenshot Scaling and Coordinate Handling
 The server automatically handles multiple scaling factors:
 - **Screenshots**: Always scaled to 50% for AI optimization with aspect ratio preservation
@@ -400,7 +483,7 @@ The server automatically handles multiple scaling factors:
 
 ### Window-Relative Coordinates
 All mouse operations use window-relative coordinates:
-1. Coordinates are relative to the window's content area (0,0)
+1. Coordinates are relative to the window's screenshot (0,0 = top-left of captured image)
 2. **Automatic scaling**: Handles different window sizes and display densities
 3. **Precise positioning**: No manual offset calculations needed
 4. **Required windowId**: Ensures accurate coordinate transformation
@@ -413,12 +496,19 @@ All mouse operations use window-relative coordinates:
 
 ## System Requirements
 
-- **macOS**: Recommended (full AppleScript support)
+### Core Requirements
 - **Node.js**: >=14.x
 - **Python**: >=3.8 with build tools (required for robotjs compilation)
   - Install with: `pip3 install setuptools` (for Python 3.12+)
   - Or use Python 3.8-3.11 which include distutils by default
 - **Permissions**: Screen recording, accessibility, automation permissions required
+
+### Platform Support
+- **macOS**: Full support with AppleScript integration for advanced window management
+- **Windows**: Full support with PowerShell and Win32 API integration
+- **Linux**: Full support with wmctrl/xdotool integration
+  - Requires: `sudo apt-get install wmctrl` (Ubuntu/Debian)
+  - Optional: `sudo apt-get install xdotool` (for additional window control options)
 
 ## Performance Optimizations
 
@@ -447,17 +537,18 @@ All mouse operations use window-relative coordinates:
 
 **Best practices for multi-display setups:**
 - Use `list_windows()` to see display location (`displayLocation` field)
+- Use `move_window_to_primary_screen()` to move windows from secondary displays for screenshot capture
 - Use `windowInsideCoordinates: true` for reliable cross-display mouse positioning
 - ⚠️ **Screenshot limitation**: Neither `screen_capture()` nor `window_capture()` can capture windows on secondary displays
-- For secondary display automation, you can focus windows and perform mouse/keyboard actions, but cannot visually inspect them
+- **Workaround**: Use `move_window_to_primary_screen()` to bring windows to primary display, then capture
 
 ## Limitations
 
 - **Screenshot capture**: Both `screen_capture()` and `window_capture()` are limited to primary display only
-- **Secondary display support**: AI agents cannot "see" or capture screenshots of windows on secondary/external displays
+- **Secondary display support**: AI agents cannot "see" or capture screenshots of windows on secondary/external displays *(but can now move them to primary display using `move_window_to_primary_screen`)*
 - **Direct coordinate mouse control**: Limited to primary display (use `windowInsideCoordinates` for cross-display)
 - Primarily tested with Claude Desktop, Claude Code and Cursor
-- macOS optimized (Windows/Linux may have limited window management features)
+- **Cross-platform**: Full support for macOS, Windows, and Linux with platform-specific optimizations
 
 ## Troubleshooting
 
@@ -524,8 +615,34 @@ This error occurs when Claude Desktop uses a different Node.js version than the 
 - Screenshot coordinates are automatically scaled 2x to account for 50% image scaling
 - When clicking buttons, aim for the center rather than edges for reliable clicks
 
+### Debug Mode Troubleshooting
+- **Enable debug logging**: Add `--debug` to server arguments in Claude Desktop configuration
+- **Debug log location**: Check `debug.log` file in the server directory
+- **Debug screenshots**: When using `debug: true` parameter, screenshots are saved as:
+  - `debug_window_*.jpg`: Window captures with click position markers
+  - `debug_fullscreen_*.jpg`: Full screen captures with cursor position
+- **No debug.log file**: Ensure server has write permissions to its directory
+- **Large debug files**: Debug mode creates additional files; clean up periodically
+
 ### Window Focus Problems
 - Use `windowId` from `list_windows` for accurate targeting
+
+### Cross-Platform Issues
+
+**Linux Window Management:**
+- Install required tools: `sudo apt-get install wmctrl xdotool`
+- Some desktop environments may require additional permissions
+- GNOME users may need to enable window management extensions
+
+**Windows PowerShell Issues:**
+- Ensure PowerShell execution policy allows scripts: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+- Some antivirus software may block PowerShell automation
+- Windows 10/11 with UAC may require elevated permissions for some operations
+
+**macOS Permissions:**
+- Grant "Accessibility" permissions in System Preferences → Security & Privacy
+- Grant "Screen Recording" permissions for screenshot functionality
+- Some apps may require additional AppleScript permissions
 
 ## Credits
 

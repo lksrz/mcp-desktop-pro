@@ -9,8 +9,30 @@ MCP Desktop Pro is an advanced Model Context Protocol server for desktop automat
 ## Development Commands
 
 - **Start server**: `npm start` or `node server.js`
+- **Start server with debug logging**: `node server.js --debug`
 - **Install dependencies**: `npm install`
 - **Test**: No tests configured (placeholder command exists)
+
+### Debug Mode
+
+Use `--debug` flag to enable comprehensive debug logging:
+- Creates `debug.log` file in the server directory
+- Logs all mouse movement transformations and coordinate calculations
+- Saves debug screenshots when `debug: true` parameter is used in tools
+- Includes startup information and error details
+
+#### Debug Logging Features:
+- **Coordinate transformations**: Detailed logs of AI coordinates → screen coordinates
+- **Window metadata**: Capture dimensions, scaling factors, and bounds information
+- **Error tracking**: Complete stack traces for troubleshooting
+- **Operation timing**: Timestamps for all major operations
+- **File operations**: Debug screenshot saves with position markers
+
+#### Debug Files Created:
+- `debug.log`: Text log with all debug information
+- `debug_window_*.jpg`: Window captures with red circle markers showing intended click positions
+- `debug_window_unmarked_*.jpg`: Clean window captures for comparison
+- `debug_fullscreen_*.jpg`: Full screen captures with cursor position markers
 
 ## Architecture
 
@@ -58,15 +80,41 @@ The server implements a complex coordinate transformation pipeline:
 
 ## Window Management Implementation
 
-The server uses a dual approach for window management:
-- **AppleScript Integration**: Primary method for reliable window focusing on macOS
-- **Fallback Strategy**: Bundle ID-based focusing if app name fails
+The server uses a comprehensive cross-platform approach for window management:
+- **macOS**: AppleScript integration with multiple fallback strategies (app name → bundle ID → System Events)
+- **Windows**: PowerShell with Win32 API calls (SetForegroundWindow, SetWindowPos)
+- **Linux**: wmctrl and xdotool integration for window control
+- **Window Movement**: Automatic repositioning of windows from secondary displays to primary screen
 - **Window Enumeration**: Real-time window list with comprehensive metadata
+- **Secondary Display Support**: Move windows to primary screen to enable screenshot capture
 
 ## Development Notes
 
+### Coordinate System - CRITICAL INFORMATION
+**All mouse coordinates (x, y) must be relative to the TOP-LEFT corner (0,0) of the window screenshot/image.**
+
+- ✅ **Correct**: Use coordinates exactly as they appear in the captured window image
+- ✅ **Reference point**: Top-left corner of the window screenshot is always (0,0)
+- ❌ **Never**: Use coordinates relative to internal UI elements, content areas, or tabs
+- ❌ **Never**: Add manual offsets for title bars, menus, or toolbars
+
+**Example**: If you see a button at position (150, 200) in the window screenshot, use exactly `x: 150, y: 200`.
+
 ### Coordinate Debugging
 When working with mouse positioning issues, use the `debug: true` parameter in `mouse_move` to get visual feedback with red circle overlays showing exact cursor positions. When clicking buttons (especially in grids like calculators), always aim for the center of the button rather than edges to ensure reliable clicks.
+
+### Automatic Coordinate Metadata
+The `mouse_move` and `mouse_click` tools now automatically create coordinate metadata when it's not available from a previous `window_capture` call. This allows for simpler workflows:
+- **Basic workflow**: `list_windows` → `mouse_click` (with coordinates) 
+- **Precise workflow**: `list_windows` → `window_capture` → `mouse_click` (with coordinates)
+
+The precise workflow using `window_capture` first provides better coordinate scaling for AI-optimized images, while the basic workflow uses 1:1 coordinate mapping.
+
+### Secondary Display Window Management
+For windows on secondary displays that cannot be captured:
+- **Detection workflow**: `list_windows` shows `displayLocation` and `isOnPrimaryDisplay` fields
+- **Move to primary**: `move_window_to_primary_screen` relocates windows to enable screenshot capture
+- **Automated workflow**: `list_windows` → `move_window_to_primary_screen` → `window_capture` → automation
 
 ### Multi-Action Sequences  
 The `multiple_desktop_actions` tool is the preferred method for complex automation workflows. It provides timing control, error handling, and sequential execution guarantees.
